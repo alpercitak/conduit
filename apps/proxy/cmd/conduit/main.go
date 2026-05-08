@@ -51,10 +51,13 @@ func main() {
 		}
 
 		u, err := r.Pick(req.Context())
+
 		if err != nil || u == nil {
 			http.Error(w, "no upstream available", 503)
 			return
 		}
+
+		respFilter := filter.NewResponseFilter(u)
 
 		target, _ := url.Parse(u.URL)
 		proxy := httputil.NewSingleHostReverseProxy(target)
@@ -63,14 +66,7 @@ func main() {
 
 		ctx.StatusCode = rw.StatusCode
 
-		if u.Breaker != nil {
-			if ctx.StatusCode >= 500 {
-				u.Breaker.Failure()
-			} else {
-				u.Breaker.Success()
-			}
-		}
-
+		_ = respFilter.After(ctx)
 		_ = chain.After(ctx)
 	})
 
