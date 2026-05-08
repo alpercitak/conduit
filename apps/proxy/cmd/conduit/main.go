@@ -19,6 +19,8 @@ import (
 
 func main() {
 
+	var traceStore = make(map[string][]core.TraceEvent)
+
 	pool := upstream.NewPool([]*upstream.Upstream{
 		{ID: "alpha", URL: "http://localhost:3001", Breaker: circuit.New(5, 10*time.Second)},
 		{ID: "beta", URL: "http://localhost:3002", Breaker: circuit.New(5, 10*time.Second)},
@@ -49,13 +51,18 @@ func main() {
 			State:     make(core.State),
 		}
 
+		ctx.Mark("request_start")
+
 		err := chain.Execute(ctx, func(ctx *core.Context) error {
+			ctx.Mark("before_routing")
 
 			u, err := r.Pick(req.Context())
 			if err != nil || u == nil {
 				http.Error(w, "no upstream available", 503)
 				return nil
 			}
+
+			ctx.Mark("upstream_selected")
 
 			ctx.UpstreamID = u.ID
 			ctx.UpstreamURL = u.URL
@@ -64,6 +71,8 @@ func main() {
 			proxy := httputil.NewSingleHostReverseProxy(target)
 
 			proxy.ServeHTTP(rw, req)
+
+			ctx.Mark("proxy_complete")
 
 			ctx.StatusCode = rw.StatusCode
 
@@ -74,6 +83,10 @@ func main() {
 			http.Error(w, "filter chain blocked request", 403)
 			return
 		}
+
+		ctx.Mark("request_end")
+
+		traceStore[ctx.RequestID] = ctx.Trace
 	})
 
 	http.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
@@ -92,6 +105,25 @@ func main() {
 				p99,
 			),
 		))
+	})
+
+	http.HandleFunc("/trace", func(w http.ResponseWriter, req *http.Request) {
+
+		id := req.URL.Query().Get("id")
+
+		if id == "" {
+			http.Error(w, "missing id", 400)
+			return
+		}
+
+		trace, ok := traceStore[id]
+		if !ok {
+			http.Error(w, "trace not found", 404)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, "%v", trace)
 	})
 
 	log.Println("[conduit] running on :8080")
