@@ -46,6 +46,7 @@ func main() {
 			RequestID: core.NewRequestID(),
 			StartTime: time.Now(),
 			Request:   req,
+			State:     make(core.State),
 		}
 
 		err := chain.Execute(ctx, func(ctx *core.Context) error {

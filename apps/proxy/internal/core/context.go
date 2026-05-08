@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+type State map[string]any
+
 type Context struct {
 	RequestID string
 	StartTime time.Time
@@ -14,4 +16,6 @@ type Context struct {
 
 	UpstreamID  string
 	UpstreamURL string
+
+	State State
 }
