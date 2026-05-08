@@ -1,9 +1,9 @@
 package router
 
 import (
-	"context"
 	"fmt"
 
+	"github.com/alpercitak/conduit/apps/proxy/internal/core"
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 )
 
@@ -15,10 +15,7 @@ func NewSmart(pool *upstream.Pool) *SmartRouter {
 	return &SmartRouter{pool: pool}
 }
 
-func (r *SmartRouter) Pick(ctx context.Context) (*upstream.Upstream, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
+func (r *SmartRouter) Pick(ctx *core.Context) (*upstream.Upstream, error) {
 
 	var best *upstream.Upstream
 	bestScore := -1.0

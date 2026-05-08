@@ -58,7 +58,7 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 
 	err := e.filters.Execute(ctx, func(ctx *core.Context) error {
 
-		u, err := e.router.Pick(req.Context())
+		u, err := e.router.Pick(ctx)
 		if err != nil || u == nil {
 			http.Error(w, "no upstream available", 503)
 			ctx.Outcome = core.OutcomeUpstreamError
@@ -78,13 +78,12 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 		proxy := httputil.NewSingleHostReverseProxy(target)
 
 		start := time.Now()
-		defer func() {
-			u.UpdateLatency(time.Since(start))
-		}()
 
 		e.tracer.Track(ctx, "proxy", func() {
 			proxy.ServeHTTP(rw, req)
 		})
+
+		u.UpdateLatency(time.Since(start))
 
 		ctx.StatusCode = rw.StatusCode
 
