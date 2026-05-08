@@ -27,9 +27,12 @@ func main() {
 
 	chain := filter.NewChain(
 		filter.NewLoggingFilter(),
+		filter.NewMetricsFilter(),
 	)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+
+		rw := core.NewResponseWriter(w)
 
 		ctx := &core.Context{
 			RequestID: core.NewRequestID(),
@@ -51,7 +54,10 @@ func main() {
 		target, _ := url.Parse(u.URL)
 		proxy := httputil.NewSingleHostReverseProxy(target)
 
-		proxy.ServeHTTP(w, req)
+		proxy.ServeHTTP(rw, req)
+
+		ctx.StatusCode = rw.StatusCode
+
 		_ = chain.After(ctx)
 	})
 

@@ -6,7 +6,8 @@ import (
 )
 
 type Context struct {
-	RequestID string
-	StartTime time.Time
-	Request   *http.Request
+	RequestID  string
+	StartTime  time.Time
+	Request    *http.Request
+	StatusCode int
 }
