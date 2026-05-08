@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/balancer"
@@ -17,9 +18,35 @@ import (
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 )
 
+type TraceStore struct {
+	mu     sync.RWMutex
+	traces map[string][]core.TraceEvent
+}
+
+func NewTraceStore() *TraceStore {
+	return &TraceStore{
+		traces: make(map[string][]core.TraceEvent),
+	}
+}
+
+func (s *TraceStore) Save(id string, trace []core.TraceEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.traces[id] = trace
+}
+
+func (s *TraceStore) Get(id string) ([]core.TraceEvent, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	trace, ok := s.traces[id]
+	return trace, ok
+}
+
 func main() {
 
-	var traceStore = make(map[string][]core.TraceEvent)
+	traceStore := NewTraceStore()
 
 	pool := upstream.NewPool([]*upstream.Upstream{
 		{ID: "alpha", URL: "http://localhost:3001", Breaker: circuit.New(5, 10*time.Second)},
@@ -86,7 +113,7 @@ func main() {
 
 		ctx.Mark("request_end")
 
-		traceStore[ctx.RequestID] = ctx.Trace
+		traceStore.Save(ctx.RequestID, ctx.Trace)
 	})
 
 	http.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
@@ -116,7 +143,7 @@ func main() {
 			return
 		}
 
-		trace, ok := traceStore[id]
+		trace, ok := traceStore.Get(id)
 		if !ok {
 			http.Error(w, "trace not found", 404)
 			return
