@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"sync"
 	"time"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/balancer"
@@ -19,35 +18,9 @@ import (
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 )
 
-type TraceStore struct {
-	mu     sync.RWMutex
-	traces map[string][]core.TraceEvent
-}
-
-func NewTraceStore() *TraceStore {
-	return &TraceStore{
-		traces: make(map[string][]core.TraceEvent),
-	}
-}
-
-func (s *TraceStore) Save(id string, trace []core.TraceEvent) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.traces[id] = trace
-}
-
-func (s *TraceStore) Get(id string) ([]core.TraceEvent, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	trace, ok := s.traces[id]
-	return trace, ok
-}
-
 func main() {
 
-	traceStore := NewTraceStore()
+	tracer := core.NewInMemoryTracer()
 
 	pool := upstream.NewPool([]*upstream.Upstream{
 		{ID: "alpha", URL: "http://localhost:3001", Breaker: circuit.New(5, 10*time.Second)},
@@ -79,21 +52,15 @@ func main() {
 			State:     make(core.State),
 		}
 
-		ctx.Mark("request_start")
+		tracer.Mark(ctx, "request_start")
 
 		err := chain.Execute(ctx, func(ctx *core.Context) error {
-			ctx.Mark("before_routing")
 
 			var u *upstream.Upstream
 			var routeErr error
 
-			start := time.Now()
-			u, routeErr = r.Pick(req.Context())
-
-			ctx.Trace = append(ctx.Trace, core.TraceEvent{
-				Name:      "routing",
-				Timestamp: start,
-				Duration:  time.Since(start),
+			tracer.Track(ctx, "routing", func() {
+				u, routeErr = r.Pick(req.Context())
 			})
 
 			if routeErr != nil || u == nil {
@@ -107,11 +74,9 @@ func main() {
 			target, _ := url.Parse(u.URL)
 			proxy := httputil.NewSingleHostReverseProxy(target)
 
-			ctx.Track("proxy", func() {
+			tracer.Track(ctx, "proxy", func() {
 				proxy.ServeHTTP(rw, req)
 			})
-
-			ctx.Mark("proxy_complete")
 
 			ctx.StatusCode = rw.StatusCode
 
@@ -123,9 +88,7 @@ func main() {
 			return
 		}
 
-		ctx.Mark("request_end")
-
-		traceStore.Save(ctx.RequestID, ctx.Trace)
+		tracer.Mark(ctx, "request_end")
 	})
 
 	http.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
@@ -155,7 +118,7 @@ func main() {
 			return
 		}
 
-		trace, ok := traceStore.Get(id)
+		trace, ok := tracer.Get(id)
 		if !ok {
 			http.Error(w, "trace not found", 404)
 			return
