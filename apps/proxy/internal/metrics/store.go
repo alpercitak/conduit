@@ -1,16 +1,19 @@
 package metrics
 
 import (
-	"sort"
+	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+const maxBufferSize = 50_000
 
 type Store struct {
 	mu sync.Mutex
 
-	Requests int
-	Errors   int
+	requests int64
+	errors   int64
 
 	latencies []time.Duration
 }
@@ -22,54 +25,44 @@ func NewStore() *Store {
 }
 
 func (s *Store) Record(success bool, latency time.Duration) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.Requests++
-
+	atomic.AddInt64(&s.requests, 1)
 	if !success {
-		s.Errors++
+		atomic.AddInt64(&s.errors, 1)
 	}
-
-	s.latencies = append(s.latencies, latency)
-}
-
-func (s *Store) snapshot() []time.Duration {
-	cp := make([]time.Duration, len(s.latencies))
-	copy(cp, s.latencies)
-	return cp
-}
-
-func percentile(data []time.Duration, p float64) time.Duration {
-	if len(data) == 0 {
-		return 0
-	}
-
-	sort.Slice(data, func(i, j int) bool {
-		return data[i] < data[j]
-	})
-
-	index := int(float64(len(data)) * p)
-	if index >= len(data) {
-		index = len(data) - 1
-	}
-
-	return data[index]
-}
-
-func (s *Store) Summary() (p50, p95, p99 time.Duration) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	if len(s.latencies) < maxBufferSize {
+		s.latencies = append(s.latencies, latency)
+	}
+	s.mu.Unlock()
+}
 
-	data := s.snapshot()
+func calcPercentile(sortedData []time.Duration, p float64) time.Duration {
+	index := int(float64(len(sortedData)) * p)
+	if index >= len(sortedData) {
+		index = len(sortedData) - 1
+	}
+	return sortedData[index]
+}
 
-	if len(data) == 0 {
-		return 0, 0, 0
+func (s *Store) Summary() (p50, p95, p99 time.Duration, reqs, errs int64) {
+	s.mu.Lock()
+	if len(s.latencies) == 0 {
+		s.mu.Unlock()
+		return 0, 0, 0, atomic.LoadInt64(&s.requests), atomic.LoadInt64(&s.errors)
 	}
 
-	p50 = percentile(data, 0.50)
-	p95 = percentile(data, 0.95)
-	p99 = percentile(data, 0.99)
+	data := s.latencies
+	s.latencies = make([]time.Duration, 0, 1024)
+	s.mu.Unlock()
 
-	return
+	reqs = atomic.LoadInt64(&s.requests)
+	errs = atomic.LoadInt64(&s.errors)
+
+	slices.Sort(data)
+
+	return calcPercentile(data, 0.50),
+		calcPercentile(data, 0.95),
+		calcPercentile(data, 0.99),
+		reqs,
+		errs
 }

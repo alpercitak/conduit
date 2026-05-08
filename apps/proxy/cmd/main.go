@@ -42,13 +42,13 @@ func main() {
 
 	http.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 
-		p50, p95, p99 := store.Summary()
+		p50, p95, p99, requests, errors := store.Summary()
 
 		w.Header().Set("Content-Type", "application/json")
 
 		if err := json.NewEncoder(w).Encode(map[string]any{
-			"requests_total": store.Requests,
-			"errors_total":   store.Errors,
+			"requests_total": requests,
+			"errors_total":   errors,
 			"p50":            p50,
 			"p95":            p95,
 			"p99":            p99,
