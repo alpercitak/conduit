@@ -5,20 +5,34 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"github.com/alpercitak/conduit/apps/proxy/internal/router"
+	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 )
 
 func main() {
 
-	target, err := url.Parse("http://localhost:3001")
-	if err != nil {
-		log.Fatal(err)
-	}
+	pool := upstream.NewPool([]*upstream.Upstream{
+		{ID: "alpha", URL: "http://localhost:3001"},
+		{ID: "beta", URL: "http://localhost:3002"},
+	})
 
-	proxy := httputil.NewSingleHostReverseProxy(target)
+	r := router.New(pool)
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[conduit] %s %s -> %s", r.Method, r.URL.Path, target)
-		proxy.ServeHTTP(w, r)
+	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+
+		u, err := r.Pick(req.Context())
+		if err != nil {
+			http.Error(w, "no upstream available", 503)
+			return
+		}
+
+		target, _ := url.Parse(u.URL)
+		proxy := httputil.NewSingleHostReverseProxy(target)
+
+		log.Printf("[conduit] %s %s -> %s", req.Method, req.URL.Path, u.URL)
+
+		proxy.ServeHTTP(w, req)
 	})
 
 	log.Println("[conduit] proxy running on :8080")
