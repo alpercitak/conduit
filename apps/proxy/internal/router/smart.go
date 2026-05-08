@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/core"
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
@@ -16,6 +17,11 @@ func NewSmart(pool *upstream.Pool) *SmartRouter {
 }
 
 func (r *SmartRouter) Pick(ctx *core.Context) (*upstream.Upstream, error) {
+	// exploration
+	if rand.Float64() < 0.1 {
+		return r.randomHealthy()
+	}
+
 	var best *upstream.Upstream
 	bestScore := -1.0
 
@@ -49,4 +55,21 @@ func Score(u *upstream.Upstream) float64 {
 	err := u.DecayedError() * 1000
 
 	return 1000 - lat - err
+}
+
+func (r *SmartRouter) randomHealthy() (*upstream.Upstream, error) {
+	var healthy []*upstream.Upstream
+
+	for _, u := range r.pool.All() {
+		if u.Breaker != nil && !u.Breaker.Allow() {
+			continue
+		}
+		healthy = append(healthy, u)
+	}
+
+	if len(healthy) == 0 {
+		return nil, fmt.Errorf("no healthy upstreams")
+	}
+
+	return healthy[rand.Intn(len(healthy))], nil
 }

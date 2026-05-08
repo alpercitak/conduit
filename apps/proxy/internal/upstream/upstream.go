@@ -1,6 +1,7 @@
 package upstream
 
 import (
+	"math"
 	"time"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/circuit"
@@ -61,18 +62,26 @@ func (u *Upstream) updateError(failed bool) {
 }
 
 func (u *Upstream) DecayedLatency() float64 {
-	return u.LatencyEWMA * decayFactor(u.lastUpdate)
+	const baseline = 100.0
+
+	factor := decayFactor(u.lastUpdate)
+
+	return baseline + (u.LatencyEWMA-baseline)*factor
 }
 
 func (u *Upstream) DecayedError() float64 {
-	return u.ErrorEWMA * decayFactor(u.lastUpdate)
+	const baseline = 0.0
+
+	factor := decayFactor(u.lastUpdate)
+
+	return baseline + (u.ErrorEWMA-baseline)*factor
 }
 
 func decayFactor(t time.Time) float64 {
 	age := time.Since(t).Seconds()
 	half := decayHalfLife.Seconds()
 
-	return 0.5 * (age / half)
+	return math.Pow(0.5, age/half)
 }
 
 func (u *Upstream) Observe(statusCode int, latency time.Duration) {
