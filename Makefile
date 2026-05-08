@@ -1,4 +1,4 @@
-.PHONY: proxy upstream1 upstream2 dev
+.PHONY: proxy upstream1 upstream2 simulator dev kill
 
 proxy:
 	go run ./apps/proxy/cmd/conduit
@@ -10,6 +10,9 @@ upstream1:
 upstream2:
 	UPSTREAM_NAME=beta PORT=3002 \
 	go run ./apps/mock-upstream/cmd/mock-upstream
+
+simulator:
+	go run ./apps/simulator/cmd/simulator
 
 dev:
 	concurrently \
