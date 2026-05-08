@@ -14,7 +14,8 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.26.3"
+          go-version-file: "go.work"
+          cache: true
 
       - run: go work sync
 

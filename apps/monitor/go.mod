@@ -1,6 +1,6 @@
 module github.com/alpercitak/conduit/apps/monitor
 
-go 1.26.3
+go 1.26
 
 require github.com/rivo/tview v0.42.0
 
