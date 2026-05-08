@@ -89,8 +89,7 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 			success = false
 		}
 
-		latency := time.Since(start)
-		u.UpdateLatency(latency)
+		u.Observe(rw.StatusCode, time.Since(start))
 
 		if success {
 			u.RecordSuccess()

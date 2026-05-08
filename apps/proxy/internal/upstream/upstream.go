@@ -74,3 +74,19 @@ func decayFactor(t time.Time) float64 {
 
 	return 0.5 * (age / half)
 }
+
+func (u *Upstream) Observe(statusCode int, latency time.Duration) {
+	u.UpdateLatency(latency)
+
+	if statusCode >= 500 {
+		u.RecordFailure()
+		return
+	}
+
+	if statusCode >= 400 {
+		u.RecordFailure()
+		return
+	}
+
+	u.RecordSuccess()
+}
