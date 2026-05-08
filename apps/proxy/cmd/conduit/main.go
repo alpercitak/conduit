@@ -33,6 +33,9 @@ func main() {
 	chain := filter.NewChain(
 		filter.NewLoggingFilter(),
 		filter.NewMetricsFilter(store),
+		filter.NewResilienceFilter(func(ctx *core.Context) *upstream.Upstream {
+			return pool.GetByID(ctx.UpstreamID)
+		}),
 	)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
@@ -57,7 +60,8 @@ func main() {
 			return
 		}
 
-		respFilter := filter.NewResponseFilter(u)
+		ctx.UpstreamID = u.ID
+		ctx.UpstreamURL = u.URL
 
 		target, _ := url.Parse(u.URL)
 		proxy := httputil.NewSingleHostReverseProxy(target)
@@ -66,7 +70,6 @@ func main() {
 
 		ctx.StatusCode = rw.StatusCode
 
-		_ = respFilter.After(ctx)
 		_ = chain.After(ctx)
 	})
 
