@@ -42,3 +42,13 @@ func (c *Context) Mark(event string) {
 		Duration:  duration,
 	})
 }
+
+func (c *Context) Track(name string, fn func()) {
+	start := time.Now()
+	fn()
+	c.Trace = append(c.Trace, TraceEvent{
+		Name:      name,
+		Timestamp: start,
+		Duration:  time.Since(start),
+	})
+}

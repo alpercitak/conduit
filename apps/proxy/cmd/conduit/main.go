@@ -84,13 +84,22 @@ func main() {
 		err := chain.Execute(ctx, func(ctx *core.Context) error {
 			ctx.Mark("before_routing")
 
-			u, err := r.Pick(req.Context())
-			if err != nil || u == nil {
+			var u *upstream.Upstream
+			var routeErr error
+
+			start := time.Now()
+			u, routeErr = r.Pick(req.Context())
+
+			ctx.Trace = append(ctx.Trace, core.TraceEvent{
+				Name:      "routing",
+				Timestamp: start,
+				Duration:  time.Since(start),
+			})
+
+			if routeErr != nil || u == nil {
 				http.Error(w, "no upstream available", 503)
 				return nil
 			}
-
-			ctx.Mark("upstream_selected")
 
 			ctx.UpstreamID = u.ID
 			ctx.UpstreamURL = u.URL
@@ -98,7 +107,9 @@ func main() {
 			target, _ := url.Parse(u.URL)
 			proxy := httputil.NewSingleHostReverseProxy(target)
 
-			proxy.ServeHTTP(rw, req)
+			ctx.Track("proxy", func() {
+				proxy.ServeHTTP(rw, req)
+			})
 
 			ctx.Mark("proxy_complete")
 
