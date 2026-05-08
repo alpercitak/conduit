@@ -14,7 +14,7 @@ type TraceEvent struct {
 type Tracer interface {
 	Mark(ctx *Context, name string)
 	Track(ctx *Context, name string, fn func())
-	Flush(ctx *Context)
+	Flush(ctx *Context) []TraceEvent
 }
 
 type InMemoryTracer struct {
