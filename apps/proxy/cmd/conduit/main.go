@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"time"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/circuit"
 	"github.com/alpercitak/conduit/apps/proxy/internal/core"
+	"github.com/alpercitak/conduit/apps/proxy/internal/executor"
 	"github.com/alpercitak/conduit/apps/proxy/internal/filter"
 	"github.com/alpercitak/conduit/apps/proxy/internal/metrics"
 	"github.com/alpercitak/conduit/apps/proxy/internal/router"
@@ -38,60 +37,9 @@ func main() {
 		}),
 	)
 
-	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+	exec := executor.New(r, tracer, chain)
 
-		rw := core.NewResponseWriter(w)
-
-		ctx := &core.Context{
-			RequestID: core.NewRequestID(),
-			StartTime: time.Now(),
-			Request:   req,
-			State:     make(core.State),
-		}
-
-		tracer.Mark(ctx, "request_start")
-
-		err := chain.Execute(ctx, func(ctx *core.Context) error {
-
-			var u *upstream.Upstream
-			var routeErr error
-
-			tracer.Track(ctx, "routing", func() {
-				u, routeErr = r.Pick(req.Context())
-			})
-
-			if routeErr != nil || u == nil {
-				http.Error(w, "no upstream available", 503)
-				return nil
-			}
-
-			ctx.UpstreamID = u.ID
-			ctx.UpstreamURL = u.URL
-
-			target, _ := url.Parse(u.URL)
-			proxy := httputil.NewSingleHostReverseProxy(target)
-
-			start := time.Now()
-
-			tracer.Track(ctx, "proxy", func() {
-				proxy.ServeHTTP(rw, req)
-			})
-
-			latency := time.Since(start)
-			u.UpdateLatency(latency)
-
-			ctx.StatusCode = rw.StatusCode
-
-			return nil
-		})
-
-		if err != nil {
-			http.Error(w, "filter chain blocked request", 403)
-			return
-		}
-
-		tracer.Mark(ctx, "request_end")
-	})
+	http.HandleFunc("/", exec.Handle)
 
 	http.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 
