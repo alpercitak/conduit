@@ -6,47 +6,71 @@ import (
 	"github.com/alpercitak/conduit/apps/proxy/internal/circuit"
 )
 
+const (
+	alphaLatency  = 0.2
+	alphaError    = 0.3
+	decayHalfLife = 30 * time.Second
+)
+
 type Upstream struct {
 	ID      string
 	URL     string
 	Breaker *circuit.Breaker
 
-	LatencyAvg time.Duration
-	ErrorRate  float64
+	LatencyEWMA float64
+	ErrorEWMA   float64
 
-	success int64
-	failure int64
+	lastUpdate time.Time
 }
 
 func (u *Upstream) UpdateLatency(d time.Duration) {
-	const alpha = 0.2
+	lat := float64(d.Milliseconds())
 
-	if u.LatencyAvg == 0 {
-		u.LatencyAvg = d
-		return
+	if u.LatencyEWMA == 0 {
+		u.LatencyEWMA = lat
+	} else {
+		u.LatencyEWMA = alphaLatency*lat + (1-alphaLatency)*u.LatencyEWMA
 	}
 
-	u.LatencyAvg = time.Duration(
-		float64(u.LatencyAvg)*(1-alpha) + float64(d)*alpha,
-	)
+	u.lastUpdate = time.Now()
 }
 
 func (u *Upstream) RecordSuccess() {
-	u.success++
-	u.recalculateErrorRate()
+	u.updateError(false)
 }
 
 func (u *Upstream) RecordFailure() {
-	u.failure++
-	u.recalculateErrorRate()
+	u.updateError(true)
 }
 
-func (u *Upstream) recalculateErrorRate() {
-	total := u.success + u.failure
-	if total == 0 {
-		u.ErrorRate = 0
-		return
+func (u *Upstream) updateError(failed bool) {
+	var errVal float64
+	if failed {
+		errVal = 1
+	} else {
+		errVal = 0
 	}
 
-	u.ErrorRate = float64(u.failure) / float64(total)
+	if u.ErrorEWMA == 0 {
+		u.ErrorEWMA = errVal
+	} else {
+		u.ErrorEWMA = alphaError*errVal + (1-alphaError)*u.ErrorEWMA
+	}
+
+	u.lastUpdate = time.Now()
+}
+
+func (u *Upstream) DecayedLatency() float64 {
+	return u.LatencyEWMA * decayFactor(u.lastUpdate)
+}
+
+func (u *Upstream) DecayedError() float64 {
+	return u.ErrorEWMA * decayFactor(u.lastUpdate)
+}
+
+func decayFactor(t time.Time) float64 {
+	age := time.Since(t).Seconds()
+	half := decayHalfLife.Seconds()
+
+	return 0.5 * (age / half)
 }

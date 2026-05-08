@@ -46,15 +46,8 @@ func Score(u *upstream.Upstream) float64 {
 		return -1
 	}
 
-	latencyPenalty := float64(u.LatencyAvg.Milliseconds())
-	if latencyPenalty > 1000 {
-		latencyPenalty = 1000
-	}
+	lat := u.DecayedLatency()
+	err := u.DecayedError() * 1000
 
-	errorPenalty := u.ErrorRate * 100
-	if errorPenalty > 500 {
-		errorPenalty = 500
-	}
-
-	return 1000 - latencyPenalty - errorPenalty
+	return 1000 - lat - err
 }
