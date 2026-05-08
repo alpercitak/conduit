@@ -48,29 +48,31 @@ func main() {
 			Request:   req,
 		}
 
-		if err := chain.Before(ctx); err != nil {
-			http.Error(w, "request blocked by filter", 403)
+		err := chain.Execute(ctx, func(ctx *core.Context) error {
+
+			u, err := r.Pick(req.Context())
+			if err != nil || u == nil {
+				http.Error(w, "no upstream available", 503)
+				return nil
+			}
+
+			ctx.UpstreamID = u.ID
+			ctx.UpstreamURL = u.URL
+
+			target, _ := url.Parse(u.URL)
+			proxy := httputil.NewSingleHostReverseProxy(target)
+
+			proxy.ServeHTTP(rw, req)
+
+			ctx.StatusCode = rw.StatusCode
+
+			return nil
+		})
+
+		if err != nil {
+			http.Error(w, "filter chain blocked request", 403)
 			return
 		}
-
-		u, err := r.Pick(req.Context())
-
-		if err != nil || u == nil {
-			http.Error(w, "no upstream available", 503)
-			return
-		}
-
-		ctx.UpstreamID = u.ID
-		ctx.UpstreamURL = u.URL
-
-		target, _ := url.Parse(u.URL)
-		proxy := httputil.NewSingleHostReverseProxy(target)
-
-		proxy.ServeHTTP(rw, req)
-
-		ctx.StatusCode = rw.StatusCode
-
-		_ = chain.After(ctx)
 	})
 
 	http.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
