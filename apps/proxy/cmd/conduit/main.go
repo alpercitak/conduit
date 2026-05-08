@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/alpercitak/conduit/apps/proxy/internal/balancer"
 	"github.com/alpercitak/conduit/apps/proxy/internal/circuit"
 	"github.com/alpercitak/conduit/apps/proxy/internal/core"
 	"github.com/alpercitak/conduit/apps/proxy/internal/filter"
@@ -27,9 +26,7 @@ func main() {
 		{ID: "beta", URL: "http://localhost:3002", Breaker: circuit.New(5, 10*time.Second)},
 	})
 
-	rr := balancer.NewRoundRobin()
-
-	r := router.New(pool, rr)
+	r := router.NewSmart(pool)
 
 	store := metrics.NewStore()
 
@@ -74,9 +71,14 @@ func main() {
 			target, _ := url.Parse(u.URL)
 			proxy := httputil.NewSingleHostReverseProxy(target)
 
+			start := time.Now()
+
 			tracer.Track(ctx, "proxy", func() {
 				proxy.ServeHTTP(rw, req)
 			})
+
+			latency := time.Since(start)
+			u.UpdateLatency(latency)
 
 			ctx.StatusCode = rw.StatusCode
 
