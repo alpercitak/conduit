@@ -16,6 +16,9 @@ jobs:
         with:
           go-version-file: "go.work"
           cache: true
+          cache-dependency-path: |
+            go.work
+            apps/**/*.mod
 
       - run: go work sync
 
