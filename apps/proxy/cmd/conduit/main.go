@@ -9,6 +9,7 @@ import (
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/balancer"
 	"github.com/alpercitak/conduit/apps/proxy/internal/core"
+	"github.com/alpercitak/conduit/apps/proxy/internal/filter"
 	"github.com/alpercitak/conduit/apps/proxy/internal/router"
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 )
@@ -24,12 +25,21 @@ func main() {
 
 	r := router.New(pool, rr)
 
+	chain := filter.NewChain(
+		filter.NewLoggingFilter(),
+	)
+
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 
 		ctx := &core.Context{
 			RequestID: core.NewRequestID(),
 			StartTime: time.Now(),
 			Request:   req,
+		}
+
+		if err := chain.Before(ctx); err != nil {
+			http.Error(w, "request blocked by filter", 403)
+			return
 		}
 
 		u, err := r.Pick(req.Context())
@@ -41,15 +51,8 @@ func main() {
 		target, _ := url.Parse(u.URL)
 		proxy := httputil.NewSingleHostReverseProxy(target)
 
-		log.Printf(
-			"[%s] %s %s -> %s",
-			ctx.RequestID,
-			req.Method,
-			req.URL.Path,
-			u.URL,
-		)
-
 		proxy.ServeHTTP(w, req)
+		_ = chain.After(ctx)
 	})
 
 	log.Println("[conduit] running on :8080")
