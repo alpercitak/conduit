@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -62,6 +63,24 @@ func main() {
 		ctx.StatusCode = rw.StatusCode
 
 		_ = chain.After(ctx)
+	})
+
+	http.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
+
+		p50, p95, p99 := store.Summary()
+
+		w.Header().Set("Content-Type", "text/plain")
+
+		w.Write([]byte(
+			fmt.Sprintf(
+				"requests_total %d\nerrors_total %d\np50 %s\np95 %s\np99 %s\n",
+				store.Requests,
+				store.Errors,
+				p50,
+				p95,
+				p99,
+			),
+		))
 	})
 
 	log.Println("[conduit] running on :8080")
