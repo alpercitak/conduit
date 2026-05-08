@@ -1,41 +1,41 @@
-.PHONY: proxy upstream1 upstream2 simulator monitor dev kill build clean
+.PHONY: all dev kill build clean run-proxy upstream1 upstream2 run-simulator run-monitor
 
-DIST=./dist
+DIST := ./dist
+APPS := conduit mock-upstream simulator monitor
 
-proxy:
+all: build
+
+build: $(APPS)
+
+$(APPS):
+	@echo "Building binary for $@..."
+	@mkdir -p $(DIST)
+	go build -o $(DIST)/$@ ./apps/$(shell [ "$@" = "conduit" ] && echo "proxy" || echo "$@")/cmd/$@
+
+run-proxy:
 	go run ./apps/proxy/cmd/conduit
 
-upstream1:
-	UPSTREAM_NAME=alpha PORT=3001 \
-	go run ./apps/mock-upstream/cmd/mock-upstream
+run-upstream1:
+	UPSTREAM_NAME=alpha PORT=3001 go run ./apps/mock-upstream/cmd/mock-upstream
 
-upstream2:
-	UPSTREAM_NAME=beta PORT=3002 \
-	go run ./apps/mock-upstream/cmd/mock-upstream
+run-upstream2:
+	UPSTREAM_NAME=beta PORT=3002 go run ./apps/mock-upstream/cmd/mock-upstream
 
-simulator:
+run-simulator:
 	go run ./apps/simulator/cmd/simulator
 
-monitor:
+run-monitor:
 	go run ./apps/monitor/cmd/monitor
-	
-dev:
+    
+dev: kill
 	concurrently \
-		"make upstream1" \
-		"make upstream2" \
-		"make proxy"
+		"make run-upstream1" \
+		"make run-upstream2" \
+		"make run-proxy"
 
 kill:
-	-kill -9 $(lsof -t -i :3001) 2>/dev/null || true
-	-kill -9 $(lsof -t -i :3002) 2>/dev/null || true
-	-kill -9 $(lsof -t -i :8080) 2>/dev/null || true
-
-build:
-	mkdir -p $(DIST)
-	go build -o $(DIST)/conduit ./apps/proxy/cmd/conduit
-	go build -o $(DIST)/mock-upstream ./apps/mock-upstream/cmd/mock-upstream
-	go build -o $(DIST)/simulator ./apps/simulator/cmd/simulator
-	go build -o $(DIST)/monitor ./apps/monitor/cmd/monitor
+	@echo "Cleaning up ports 3001, 3002, 8080..."
+	@lsof -t -i :3001,3002,8080 | xargs kill -9 2>/dev/null || true
 
 clean:
-	rm -rf $(DIST)	
+	rm -rf $(DIST)
