@@ -79,11 +79,24 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 
 		start := time.Now()
 
+		var success bool = true
+
 		e.tracer.Track(ctx, "proxy", func() {
 			proxy.ServeHTTP(rw, req)
 		})
 
-		u.UpdateLatency(time.Since(start))
+		if rw.StatusCode >= 500 {
+			success = false
+		}
+
+		latency := time.Since(start)
+		u.UpdateLatency(latency)
+
+		if success {
+			u.RecordSuccess()
+		} else {
+			u.RecordFailure()
+		}
 
 		ctx.StatusCode = rw.StatusCode
 

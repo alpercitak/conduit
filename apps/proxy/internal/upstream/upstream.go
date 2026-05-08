@@ -13,6 +13,9 @@ type Upstream struct {
 
 	LatencyAvg time.Duration
 	ErrorRate  float64
+
+	success int64
+	failure int64
 }
 
 func (u *Upstream) UpdateLatency(d time.Duration) {
@@ -29,11 +32,21 @@ func (u *Upstream) UpdateLatency(d time.Duration) {
 }
 
 func (u *Upstream) RecordSuccess() {
-	const alpha = 0.1
-	u.ErrorRate = u.ErrorRate * (1 - alpha)
+	u.success++
+	u.recalculateErrorRate()
 }
 
 func (u *Upstream) RecordFailure() {
-	const alpha = 0.1
-	u.ErrorRate = u.ErrorRate*(1-alpha) + 1*alpha
+	u.failure++
+	u.recalculateErrorRate()
+}
+
+func (u *Upstream) recalculateErrorRate() {
+	total := u.success + u.failure
+	if total == 0 {
+		u.ErrorRate = 0
+		return
+	}
+
+	u.ErrorRate = float64(u.failure) / float64(total)
 }
