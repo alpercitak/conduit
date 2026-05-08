@@ -8,7 +8,6 @@ import (
 )
 
 func main() {
-
 	name := os.Getenv("UPSTREAM_NAME")
 	if name == "" {
 		name = "upstream"

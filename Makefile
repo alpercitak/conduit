@@ -10,22 +10,22 @@ build: $(APPS)
 $(APPS):
 	@echo "Building binary for $@..."
 	@mkdir -p $(DIST)
-	go build -o $(DIST)/$@ ./apps/$@/cmd
+	go build -o $(DIST)/$@ ./apps/$@/cmd/$@
 
 run-proxy:
-	go run ./apps/proxy/cmd
+	go run ./apps/proxy/cmd/proxy
 
 run-upstream1:
-	UPSTREAM_NAME=alpha PORT=3001 go run ./apps/mock-upstream/cmd
+	UPSTREAM_NAME=alpha PORT=3001 go run ./apps/mock-upstream/cmd/mock-upstream
 
 run-upstream2:
-	UPSTREAM_NAME=beta PORT=3002 go run ./apps/mock-upstream/cmd
+	UPSTREAM_NAME=beta PORT=3002 go run ./apps/mock-upstream/cmd/mock-upstream
 
 run-simulator:
-	go run ./apps/simulator/cmd
+	go run ./apps/simulator/cmd/simulator
 
 run-monitor:
-	go run ./apps/monitor/cmd
+	go run ./apps/monitor/cmd/monitor
     
 dev: kill
 	concurrently \
