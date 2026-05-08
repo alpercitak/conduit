@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/balancer"
+	"github.com/alpercitak/conduit/apps/proxy/internal/circuit"
 	"github.com/alpercitak/conduit/apps/proxy/internal/core"
 	"github.com/alpercitak/conduit/apps/proxy/internal/filter"
 	"github.com/alpercitak/conduit/apps/proxy/internal/metrics"
@@ -19,8 +20,8 @@ import (
 func main() {
 
 	pool := upstream.NewPool([]*upstream.Upstream{
-		{ID: "alpha", URL: "http://localhost:3001"},
-		{ID: "beta", URL: "http://localhost:3002"},
+		{ID: "alpha", URL: "http://localhost:3001", Breaker: circuit.New(5, 10*time.Second)},
+		{ID: "beta", URL: "http://localhost:3002", Breaker: circuit.New(5, 10*time.Second)},
 	})
 
 	rr := balancer.NewRoundRobin()

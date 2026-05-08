@@ -24,8 +24,17 @@ func (r *RoundRobin) Pick(ups []*upstream.Upstream) *upstream.Upstream {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	u := ups[r.idx%len(ups)]
-	r.idx++
+	n := len(ups)
 
-	return u
+	for i := 0; i < n; i++ {
+
+		u := ups[r.idx%n]
+		r.idx++
+
+		if u.Breaker == nil || u.Breaker.Allow() {
+			return u
+		}
+	}
+
+	return nil
 }
