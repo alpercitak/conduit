@@ -10,6 +10,7 @@ import (
 	"github.com/alpercitak/conduit/apps/proxy/internal/balancer"
 	"github.com/alpercitak/conduit/apps/proxy/internal/core"
 	"github.com/alpercitak/conduit/apps/proxy/internal/filter"
+	"github.com/alpercitak/conduit/apps/proxy/internal/metrics"
 	"github.com/alpercitak/conduit/apps/proxy/internal/router"
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 )
@@ -25,9 +26,11 @@ func main() {
 
 	r := router.New(pool, rr)
 
+	store := metrics.NewStore()
+
 	chain := filter.NewChain(
 		filter.NewLoggingFilter(),
-		filter.NewMetricsFilter(),
+		filter.NewMetricsFilter(store),
 	)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {

@@ -1,16 +1,19 @@
 package filter
 
 import (
-	"log"
 	"time"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/core"
+	"github.com/alpercitak/conduit/apps/proxy/internal/metrics"
 )
 
-type MetricsFilter struct{}
+// MetricsFilter records request performance data.
+type MetricsFilter struct {
+	store *metrics.Store
+}
 
-func NewMetricsFilter() *MetricsFilter {
-	return &MetricsFilter{}
+func NewMetricsFilter(store *metrics.Store) *MetricsFilter {
+	return &MetricsFilter{store: store}
 }
 
 func (f *MetricsFilter) Before(ctx *core.Context) error {
@@ -19,14 +22,11 @@ func (f *MetricsFilter) Before(ctx *core.Context) error {
 
 func (f *MetricsFilter) After(ctx *core.Context) error {
 
-	duration := time.Since(ctx.StartTime)
+	latency := time.Since(ctx.StartTime)
 
-	log.Printf(
-		"[metrics] req=%s duration=%s status=%d",
-		ctx.RequestID,
-		duration,
-		ctx.StatusCode,
-	)
+	success := ctx.StatusCode >= 200 && ctx.StatusCode < 500
+
+	f.store.Record(success, latency)
 
 	return nil
 }
