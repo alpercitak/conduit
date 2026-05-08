@@ -1,0 +1,45 @@
+name: "conduit"
+
+services:
+  proxy:
+    build:
+      context: ..
+      dockerfile: ./infra/build.Dockerfile
+      args:
+        - APP_PATH=proxy
+        - APP_PORT=8080
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ALPHA_URL=http://mock-upstream-alpha:3001
+      - BETA_URL=http://mock-upstream-beta:3002
+    depends_on:
+      - mock-upstream-alpha
+      - mock-upstream-beta
+
+  mock-upstream-alpha:
+    build:
+      context: ..
+      dockerfile: ./infra/build.Dockerfile
+      args:
+        - APP_PATH=mock-upstream
+        - APP_PORT=3001
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - UPSTREAM_NAME=alpha
+
+  mock-upstream-beta:
+    build:
+      context: ..
+      dockerfile: ./infra/build.Dockerfile
+      args:
+        - APP_PATH=mock-upstream
+        - APP_PORT=3002
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - UPSTREAM_NAME=beta

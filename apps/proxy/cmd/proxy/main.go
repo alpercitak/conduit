@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/circuit"
@@ -16,12 +17,14 @@ import (
 )
 
 func main() {
-
 	tracer := core.NewInMemoryTracer()
 
+	alphaURL := getEnv("ALPHA_URL", "http://localhost:3001")
+	betaURL := getEnv("BETA_URL", "http://localhost:3002")
+
 	pool := upstream.NewPool([]*upstream.Upstream{
-		{ID: "alpha", URL: "http://localhost:3001", Breaker: circuit.New(5, 10*time.Second)},
-		{ID: "beta", URL: "http://localhost:3002", Breaker: circuit.New(5, 10*time.Second)},
+		{ID: "alpha", URL: alphaURL, Breaker: circuit.New(5, 10*time.Second)},
+		{ID: "beta", URL: betaURL, Breaker: circuit.New(5, 10*time.Second)},
 	})
 
 	r := router.NewSmart(pool)
@@ -79,4 +82,11 @@ func main() {
 
 	log.Println("[conduit] running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }

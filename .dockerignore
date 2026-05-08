@@ -1,0 +1,16 @@
+.git
+.gitignore
+
+dist/
+bin/
+*.exe
+*.test
+*.prof
+
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+docker-compose.yaml
+Dockerfile

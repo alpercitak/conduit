@@ -2,6 +2,7 @@
 
 DIST := ./dist
 APPS := proxy mock-upstream simulator monitor
+DOCKER_COMPOSE = docker-compose -f infra/docker-compose.yaml
 
 all: build
 
@@ -39,3 +40,15 @@ kill:
 
 clean:
 	rm -rf $(DIST)
+
+dc-up: 
+	$(DOCKER_COMPOSE) up  -d
+
+dc-down:
+	$(DOCKER_COMPOSE) down
+
+dc-build:
+	$(DOCKER_COMPOSE) build
+
+dc-logs:
+	$(DOCKER_COMPOSE) logs -f
