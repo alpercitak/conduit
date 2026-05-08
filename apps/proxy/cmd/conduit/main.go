@@ -1,17 +1,27 @@
 package main
 
 import (
-    "log"
-    "net/http"
+	"log"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
 )
 
 func main() {
 
-    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        w.Write([]byte("conduit proxy running"))
-    })
+	target, err := url.Parse("http://localhost:3001")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    log.Println("[conduit] listening on :8080")
+	proxy := httputil.NewSingleHostReverseProxy(target)
 
-    log.Fatal(http.ListenAndServe(":8080", nil))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[conduit] %s %s -> %s", r.Method, r.URL.Path, target)
+		proxy.ServeHTTP(w, r)
+	})
+
+	log.Println("[conduit] proxy running on :8080")
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
