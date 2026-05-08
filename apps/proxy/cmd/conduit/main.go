@@ -63,6 +63,14 @@ func main() {
 
 		ctx.StatusCode = rw.StatusCode
 
+		if u.Breaker != nil {
+			if ctx.StatusCode >= 500 {
+				u.Breaker.Failure()
+			} else {
+				u.Breaker.Success()
+			}
+		}
+
 		_ = chain.After(ctx)
 	})
 
