@@ -60,6 +60,16 @@ func (t *InMemoryTracer) Get(id string) ([]TraceEvent, bool) {
 	return trace, ok
 }
 
-func (t *InMemoryTracer) Flush(ctx *Context) {
+func (t *InMemoryTracer) Flush(ctx *Context) []TraceEvent {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
+	events, exists := t.traces[ctx.RequestID]
+	if !exists {
+		return nil
+	}
+
+	delete(t.traces, ctx.RequestID)
+
+	return events
 }

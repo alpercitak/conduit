@@ -18,7 +18,6 @@ func (f *ResponseFilter) Before(ctx *core.Context) error {
 }
 
 func (f *ResponseFilter) After(ctx *core.Context) error {
-
 	if f.Upstream == nil || f.Upstream.Breaker == nil {
 		return nil
 	}

@@ -21,7 +21,6 @@ func (f *MetricsFilter) Before(ctx *core.Context) error {
 }
 
 func (f *MetricsFilter) After(ctx *core.Context) error {
-
 	latency := time.Since(ctx.StartTime)
 
 	success := ctx.StatusCode >= 200 && ctx.StatusCode < 500

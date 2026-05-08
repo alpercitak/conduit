@@ -18,7 +18,6 @@ func (f *ResilienceFilter) Before(ctx *core.Context) error {
 }
 
 func (f *ResilienceFilter) After(ctx *core.Context) error {
-
 	u := f.UpstreamResolver(ctx)
 	if u == nil || u.Breaker == nil {
 		return nil

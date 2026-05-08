@@ -8,7 +8,6 @@ type Pool struct {
 }
 
 func NewPool(ups []*Upstream) *Pool {
-
 	m := make(map[string]*Upstream)
 
 	for _, u := range ups {

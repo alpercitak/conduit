@@ -16,7 +16,6 @@ func NewSmart(pool *upstream.Pool) *SmartRouter {
 }
 
 func (r *SmartRouter) Pick(ctx *core.Context) (*upstream.Upstream, error) {
-
 	var best *upstream.Upstream
 	bestScore := -1.0
 

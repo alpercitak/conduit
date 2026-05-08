@@ -57,7 +57,6 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 	e.tracer.Mark(ctx, "request_start")
 
 	err := e.filters.Execute(ctx, func(ctx *core.Context) error {
-
 		u, err := e.router.Pick(ctx)
 		if err != nil || u == nil {
 			http.Error(w, "no upstream available", 503)

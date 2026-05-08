@@ -13,7 +13,6 @@ func NewChain(filters ...Filter) *Chain {
 }
 
 func (c *Chain) Execute(ctx *core.Context, handler Handler) error {
-
 	for _, f := range c.filters {
 		if err := f.Before(ctx); err != nil {
 			return err
