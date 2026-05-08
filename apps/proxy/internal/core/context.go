@@ -10,6 +10,7 @@ type State map[string]any
 type TraceEvent struct {
 	Name      string
 	Timestamp time.Time
+	Duration  time.Duration
 }
 
 type Context struct {
@@ -27,8 +28,17 @@ type Context struct {
 }
 
 func (c *Context) Mark(event string) {
+	now := time.Now()
+
+	var duration time.Duration
+	if len(c.Trace) > 0 {
+		last := c.Trace[len(c.Trace)-1]
+		duration = now.Sub(last.Timestamp)
+	}
+
 	c.Trace = append(c.Trace, TraceEvent{
 		Name:      event,
-		Timestamp: time.Now(),
+		Timestamp: now,
+		Duration:  duration,
 	})
 }

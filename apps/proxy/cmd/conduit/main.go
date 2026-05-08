@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -150,7 +151,7 @@ func main() {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, "%v", trace)
+		json.NewEncoder(w).Encode(trace)
 	})
 
 	log.Println("[conduit] running on :8080")
