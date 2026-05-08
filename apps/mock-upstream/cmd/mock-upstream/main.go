@@ -18,7 +18,12 @@ func main() {
 		fmt.Fprintf(w, "response from %s\n", name)
 	})
 
-	log.Printf("[%s] listening on :3001", name)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3001"
+	}
 
-	log.Fatal(http.ListenAndServe(":3001", nil))
+	log.Printf("[%s] listening on :"+port, name)
+
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

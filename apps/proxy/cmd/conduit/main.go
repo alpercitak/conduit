@@ -6,6 +6,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
+	"github.com/alpercitak/conduit/apps/proxy/internal/balancer"
 	"github.com/alpercitak/conduit/apps/proxy/internal/router"
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 )
@@ -17,12 +18,14 @@ func main() {
 		{ID: "beta", URL: "http://localhost:3002"},
 	})
 
-	r := router.New(pool)
+	rr := balancer.NewRoundRobin()
+
+	r := router.New(pool, rr)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 
 		u, err := r.Pick(req.Context())
-		if err != nil {
+		if err != nil || u == nil {
 			http.Error(w, "no upstream available", 503)
 			return
 		}
@@ -35,7 +38,7 @@ func main() {
 		proxy.ServeHTTP(w, req)
 	})
 
-	log.Println("[conduit] proxy running on :8080")
+	log.Println("[conduit] running on :8080")
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
