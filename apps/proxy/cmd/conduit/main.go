@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -45,18 +44,18 @@ func main() {
 
 		p50, p95, p99 := store.Summary()
 
-		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Type", "application/json")
 
-		w.Write([]byte(
-			fmt.Sprintf(
-				"requests_total %d\nerrors_total %d\np50 %s\np95 %s\np99 %s\n",
-				store.Requests,
-				store.Errors,
-				p50,
-				p95,
-				p99,
-			),
-		))
+		if err := json.NewEncoder(w).Encode(map[string]any{
+			"requests_total": store.Requests,
+			"errors_total":   store.Errors,
+			"p50":            p50,
+			"p95":            p95,
+			"p99":            p99,
+		}); err != nil {
+			http.Error(w, "failed to encode metrics", 500)
+			return
+		}
 	})
 
 	http.HandleFunc("/trace", func(w http.ResponseWriter, req *http.Request) {

@@ -14,6 +14,9 @@ upstream2:
 simulator:
 	go run ./apps/simulator/cmd/simulator
 
+monitor:
+	go run ./apps/monitor/cmd/monitor
+	
 dev:
 	concurrently \
 		"make upstream1" \

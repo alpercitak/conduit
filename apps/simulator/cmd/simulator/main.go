@@ -2,111 +2,101 @@ package main
 
 import (
 	"fmt"
-	"io"
+	"math/rand"
 	"net/http"
 	"sync"
 	"time"
 )
 
-type Result struct {
-	StatusCode int
-	Latency    time.Duration
-	Err        error
+type Profile struct {
+	Name          string
+	URL           string
+	LatencyBase   time.Duration
+	LatencyJitter time.Duration
+	ErrorRate     float64
 }
 
-func hit(client *http.Client, url string) Result {
-	start := time.Now()
+func (p Profile) Do(req *http.Request) (*http.Response, error) {
+	// simulate latency
+	lat := p.LatencyBase + time.Duration(rand.Int63n(int64(p.LatencyJitter)))
+	time.Sleep(lat)
 
-	resp, err := client.Get(url)
-	if err != nil {
-		return Result{Err: err}
+	// simulate failure
+	if rand.Float64() < p.ErrorRate {
+		return nil, fmt.Errorf("simulated upstream failure: %s", p.Name)
 	}
-	defer resp.Body.Close()
-	io.ReadAll(resp.Body)
 
-	return Result{
-		StatusCode: resp.StatusCode,
-		Latency:    time.Since(start),
-	}
+	return &http.Response{
+		StatusCode: 200,
+		Body:       http.NoBody,
+	}, nil
 }
 
 func main() {
-	target := "http://localhost:8080/"
+	rand.Seed(time.Now().UnixNano())
 
-	const (
-		totalRequests = 200
-		concurrency   = 20
-	)
+	proxyURL := "http://localhost:8080/"
 
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
+	traffic := 500 // base RPS
 
-	results := make(chan Result, totalRequests)
+	// alpha := Profile{
+	// 	Name:          "alpha",
+	// 	LatencyBase:   30 * time.Millisecond,
+	// 	LatencyJitter: 50 * time.Millisecond,
+	// 	ErrorRate:     0.01,
+	// }
+
+	// beta := Profile{
+	// 	Name:          "beta",
+	// 	LatencyBase:   200 * time.Millisecond,
+	// 	LatencyJitter: 800 * time.Millisecond,
+	// 	ErrorRate:     0.15,
+	// }
+
+	client := &http.Client{Timeout: 3 * time.Second}
 
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, concurrency)
 
-	fmt.Println("[simulator] starting load test...")
-	fmt.Printf("[simulator] target=%s requests=%d concurrency=%d\n",
-		target, totalRequests, concurrency)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 
-	startAll := time.Now()
+	for range ticker.C {
 
-	for i := 0; i < totalRequests; i++ {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			results <- hit(client, target)
-		}()
-	}
-
-	wg.Wait()
-	close(results)
-
-	duration := time.Since(startAll)
-
-	var (
-		ok, errCount int
-		totalLatency time.Duration
-		maxLatency   time.Duration
-		minLatency   = time.Hour
-	)
-
-	for r := range results {
-		if r.Err != nil {
-			errCount++
-			continue
+		// BURST MODE
+		currentRPS := traffic
+		if rand.Float64() < 0.2 {
+			currentRPS = traffic * 8 // spikes
+			fmt.Println("[SIM] BURST x8")
 		}
 
-		ok++
-		totalLatency += r.Latency
+		for i := 0; i < currentRPS; i++ {
+			wg.Add(1)
 
-		if r.Latency > maxLatency {
-			maxLatency = r.Latency
+			go func(i int) {
+				defer wg.Done()
+
+				req, _ := http.NewRequest("GET", proxyURL, nil)
+
+				// just random noise header
+				req.Header.Set("X-Sim-Req", fmt.Sprint(i))
+
+				start := time.Now()
+				resp, err := client.Do(req)
+				lat := time.Since(start)
+
+				if err != nil {
+					fmt.Println("[SIM ERROR]", err, "lat:", lat)
+					return
+				}
+
+				_ = resp.Body.Close()
+
+				if lat > 500*time.Millisecond {
+					fmt.Println("[SLOW]", lat)
+				}
+			}(i)
 		}
-		if r.Latency < minLatency {
-			minLatency = r.Latency
-		}
-	}
 
-	avg := time.Duration(0)
-	if ok > 0 {
-		avg = totalLatency / time.Duration(ok)
+		wg.Wait()
 	}
-
-	fmt.Println("\n--- simulation results ---")
-	fmt.Printf("total time:   %s\n", duration)
-	fmt.Printf("requests:     %d\n", totalRequests)
-	fmt.Printf("success:      %d\n", ok)
-	fmt.Printf("errors:       %d\n", errCount)
-	fmt.Printf("avg latency:  %s\n", avg)
-	fmt.Printf("min latency:  %s\n", minLatency)
-	fmt.Printf("max latency:  %s\n", maxLatency)
-	fmt.Println("--------------------------")
 }
