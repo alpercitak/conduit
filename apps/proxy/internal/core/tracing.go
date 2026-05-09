@@ -19,7 +19,7 @@ type Tracer interface {
 
 type InMemoryTracer struct {
 	traces map[string][]TraceEvent
-	mu     sync.RWMutex
+	mu     sync.Mutex
 }
 
 func NewInMemoryTracer() *InMemoryTracer {
@@ -28,14 +28,16 @@ func NewInMemoryTracer() *InMemoryTracer {
 	}
 }
 
+func (t *InMemoryTracer) append(id string, evt TraceEvent) {
+	t.traces[id] = append(t.traces[id], evt)
+}
+
 func (t *InMemoryTracer) Mark(ctx *Context, name string) {
-	evt := TraceEvent{
+	t.mu.Lock()
+	t.append(ctx.RequestID, TraceEvent{
 		Name:      name,
 		Timestamp: time.Now(),
-	}
-
-	t.mu.Lock()
-	t.traces[ctx.RequestID] = append(t.traces[ctx.RequestID], evt)
+	})
 	t.mu.Unlock()
 }
 
@@ -44,7 +46,7 @@ func (t *InMemoryTracer) Track(ctx *Context, name string, fn func()) {
 	fn()
 
 	t.mu.Lock()
-	t.traces[ctx.RequestID] = append(t.traces[ctx.RequestID], TraceEvent{
+	t.append(ctx.RequestID, TraceEvent{
 		Name:      name,
 		Timestamp: start,
 		Duration:  time.Since(start),
@@ -53,8 +55,8 @@ func (t *InMemoryTracer) Track(ctx *Context, name string, fn func()) {
 }
 
 func (t *InMemoryTracer) Get(id string) ([]TraceEvent, bool) {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	trace, ok := t.traces[id]
 	return trace, ok
@@ -64,12 +66,11 @@ func (t *InMemoryTracer) Flush(ctx *Context) []TraceEvent {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	events, exists := t.traces[ctx.RequestID]
-	if !exists {
+	events, ok := t.traces[ctx.RequestID]
+	if !ok {
 		return nil
 	}
 
 	delete(t.traces, ctx.RequestID)
-
 	return events
 }

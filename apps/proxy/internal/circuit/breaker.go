@@ -23,6 +23,8 @@ type Breaker struct {
 
 	failureThreshold int
 	retryTimeout     time.Duration
+
+	halfOpenAllowed bool
 }
 
 func New(failureThreshold int, retryTimeout time.Duration) *Breaker {
@@ -42,12 +44,17 @@ func (b *Breaker) Allow() bool {
 	case Open:
 		if time.Since(b.lastFailTime) > b.retryTimeout {
 			b.state = HalfOpen
+			b.halfOpenAllowed = true
 			return true
 		}
 		return false
 
 	case HalfOpen:
-		return true
+		if b.halfOpenAllowed {
+			b.halfOpenAllowed = false
+			return true
+		}
+		return false
 
 	default:
 		return true
@@ -60,6 +67,7 @@ func (b *Breaker) Success() {
 
 	b.state = Closed
 	b.failureCount = 0
+	b.halfOpenAllowed = false
 }
 
 func (b *Breaker) Failure() {
@@ -68,6 +76,8 @@ func (b *Breaker) Failure() {
 
 	b.failureCount++
 	b.lastFailTime = time.Now()
+
+	b.halfOpenAllowed = false
 
 	if b.failureCount >= b.failureThreshold {
 		b.state = Open

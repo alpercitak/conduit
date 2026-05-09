@@ -1,92 +1,53 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/circuit"
+	"github.com/alpercitak/conduit/apps/proxy/internal/config"
 	"github.com/alpercitak/conduit/apps/proxy/internal/core"
 	"github.com/alpercitak/conduit/apps/proxy/internal/executor"
 	"github.com/alpercitak/conduit/apps/proxy/internal/filter"
 	"github.com/alpercitak/conduit/apps/proxy/internal/metrics"
 	"github.com/alpercitak/conduit/apps/proxy/internal/router"
+	"github.com/alpercitak/conduit/apps/proxy/internal/tracer"
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 )
 
 func main() {
-	tracer := core.NewInMemoryTracer()
+	inMemoryTracer := core.NewInMemoryTracer()
 
-	alphaURL := getEnv("ALPHA_URL", "http://localhost:3001")
-	betaURL := getEnv("BETA_URL", "http://localhost:3002")
+	alphaURL := config.GetEnv("ALPHA_URL", "http://localhost:3001")
+	betaURL := config.GetEnv("BETA_URL", "http://localhost:3002")
 
-	pool := upstream.NewPool([]*upstream.Upstream{
-		{ID: "alpha", URL: alphaURL, Breaker: circuit.New(5, 10*time.Second)},
-		{ID: "beta", URL: betaURL, Breaker: circuit.New(5, 10*time.Second)},
-	})
+	alpha, err := upstream.New("alpha", alphaURL, circuit.New(5, 10*time.Second))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	r := router.NewSmart(pool)
+	beta, err := upstream.New("beta", betaURL, circuit.New(5, 10*time.Second))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	store := metrics.NewStore()
-
-	chain := filter.NewChain(
+	upstreamPool := upstream.NewPool([]*upstream.Upstream{alpha, beta})
+	smartRouter := router.NewSmart(upstreamPool)
+	metricsStore := metrics.NewStore()
+	filterChain := filter.NewChain(
 		filter.NewLoggingFilter(),
-		filter.NewMetricsFilter(store),
+		filter.NewMetricsFilter(metricsStore),
 		filter.NewResilienceFilter(func(ctx *core.Context) *upstream.Upstream {
-			return pool.GetByID(ctx.UpstreamID)
+			return upstreamPool.GetByID(ctx.UpstreamID)
 		}),
 	)
-
-	exec := executor.New(r, tracer, chain)
+	exec := executor.New(smartRouter, inMemoryTracer, filterChain)
 
 	http.HandleFunc("/", exec.Handle)
-
-	http.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
-
-		p50, p95, p99, requests, errors := store.Summary()
-
-		w.Header().Set("Content-Type", "application/json")
-
-		if err := json.NewEncoder(w).Encode(map[string]any{
-			"requests_total": requests,
-			"errors_total":   errors,
-			"p50":            p50,
-			"p95":            p95,
-			"p99":            p99,
-		}); err != nil {
-			http.Error(w, "failed to encode metrics", 500)
-			return
-		}
-	})
-
-	http.HandleFunc("/trace", func(w http.ResponseWriter, req *http.Request) {
-
-		id := req.URL.Query().Get("id")
-
-		if id == "" {
-			http.Error(w, "missing id", 400)
-			return
-		}
-
-		trace, ok := tracer.Get(id)
-		if !ok {
-			http.Error(w, "trace not found", 404)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(trace)
-	})
+	http.HandleFunc("/metrics", metrics.HTTPHandler(metricsStore))
+	http.HandleFunc("/trace", tracer.HTTPHandler(inMemoryTracer))
 
 	log.Println("[conduit] running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
 }

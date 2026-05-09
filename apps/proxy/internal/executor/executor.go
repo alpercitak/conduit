@@ -2,8 +2,6 @@ package executor
 
 import (
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"time"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/core"
@@ -17,7 +15,11 @@ type Executor struct {
 	filters *filter.Chain
 }
 
-func New(router *router.SmartRouter, tracer core.Tracer, filters *filter.Chain) *Executor {
+func New(
+	router *router.SmartRouter,
+	tracer core.Tracer,
+	filters *filter.Chain,
+) *Executor {
 	return &Executor{
 		router:  router,
 		tracer:  tracer,
@@ -27,19 +29,6 @@ func New(router *router.SmartRouter, tracer core.Tracer, filters *filter.Chain) 
 
 func (e *Executor) finalize(ctx *core.Context) {
 	e.tracer.Mark(ctx, "request_end")
-
-	if ctx.Outcome == "" {
-		switch {
-		case ctx.StatusCode >= 500:
-			ctx.Outcome = core.OutcomeServerError
-		case ctx.StatusCode >= 400:
-			ctx.Outcome = core.OutcomeClientError
-		default:
-			ctx.Outcome = core.OutcomeSuccess
-		}
-	}
-
-	e.tracer.Mark(ctx, "request_finalized")
 }
 
 func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
@@ -57,52 +46,50 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 	e.tracer.Mark(ctx, "request_start")
 
 	err := e.filters.Execute(ctx, func(ctx *core.Context) error {
-		u, err := e.router.Pick(ctx)
-		if err != nil || u == nil {
-			http.Error(w, "no upstream available", 503)
+
+		u, err := e.router.Pick()
+		if err != nil {
+			http.Error(w, "no upstream available", http.StatusServiceUnavailable)
+
 			ctx.Outcome = core.OutcomeUpstreamError
+
 			return nil
 		}
 
 		ctx.UpstreamID = u.ID
 		ctx.UpstreamURL = u.URL
 
-		target, err := url.Parse(u.URL)
-		if err != nil {
-			http.Error(w, "bad upstream url", 500)
-			ctx.Outcome = core.OutcomeServerError
-			return nil
-		}
-
-		proxy := httputil.NewSingleHostReverseProxy(target)
-
 		start := time.Now()
 
-		var success bool = true
-
 		e.tracer.Track(ctx, "proxy", func() {
-			proxy.ServeHTTP(rw, req)
+			u.Proxy.ServeHTTP(rw, req)
 		})
 
-		if rw.StatusCode >= 500 {
-			success = false
-		}
+		latency := time.Since(start)
 
-		u.Observe(rw.StatusCode, time.Since(start))
-
-		if success {
-			u.RecordSuccess()
-		} else {
-			u.RecordFailure()
-		}
+		u.RecordLatency(latency)
 
 		ctx.StatusCode = rw.StatusCode
+
+		switch {
+		case rw.StatusCode >= 500:
+			u.RecordFailure()
+			ctx.Outcome = core.OutcomeUpstreamError
+
+		case rw.StatusCode >= 400:
+			u.RecordFailure()
+			ctx.Outcome = core.OutcomeClientError
+
+		default:
+			u.RecordSuccess()
+			ctx.Outcome = core.OutcomeSuccess
+		}
 
 		return nil
 	})
 
 	if err != nil {
-		http.Error(w, "blocked", 403)
+		http.Error(w, "blocked", http.StatusForbidden)
 		ctx.Outcome = core.OutcomeBlocked
 		return
 	}

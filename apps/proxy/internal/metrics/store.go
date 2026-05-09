@@ -26,9 +26,11 @@ func NewStore() *Store {
 
 func (s *Store) Record(success bool, latency time.Duration) {
 	atomic.AddInt64(&s.requests, 1)
+
 	if !success {
 		atomic.AddInt64(&s.errors, 1)
 	}
+
 	s.mu.Lock()
 	if len(s.latencies) < maxBufferSize {
 		s.latencies = append(s.latencies, latency)
@@ -36,23 +38,30 @@ func (s *Store) Record(success bool, latency time.Duration) {
 	s.mu.Unlock()
 }
 
-func calcPercentile(sortedData []time.Duration, p float64) time.Duration {
-	index := int(float64(len(sortedData)) * p)
-	if index >= len(sortedData) {
-		index = len(sortedData) - 1
+func calcPercentile(sorted []time.Duration, p float64) time.Duration {
+	if len(sorted) == 0 {
+		return 0
 	}
-	return sortedData[index]
+
+	idx := int(float64(len(sorted)-1) * p)
+	return sorted[idx]
 }
 
+// Summary returns and clears the latency buffer
 func (s *Store) Summary() (p50, p95, p99 time.Duration, reqs, errs int64) {
 	s.mu.Lock()
+
 	if len(s.latencies) == 0 {
 		s.mu.Unlock()
-		return 0, 0, 0, atomic.LoadInt64(&s.requests), atomic.LoadInt64(&s.errors)
+		return 0, 0, 0,
+			atomic.LoadInt64(&s.requests),
+			atomic.LoadInt64(&s.errors)
 	}
 
-	data := s.latencies
+	// snapshot + reset buffer
+	data := append([]time.Duration(nil), s.latencies...)
 	s.latencies = make([]time.Duration, 0, 1024)
+
 	s.mu.Unlock()
 
 	reqs = atomic.LoadInt64(&s.requests)

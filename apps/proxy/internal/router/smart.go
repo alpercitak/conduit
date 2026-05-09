@@ -4,33 +4,37 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/alpercitak/conduit/apps/proxy/internal/core"
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 )
+
+const explorationRate = 0.1
 
 type SmartRouter struct {
 	pool *upstream.Pool
 }
 
 func NewSmart(pool *upstream.Pool) *SmartRouter {
-	return &SmartRouter{pool: pool}
+	return &SmartRouter{
+		pool: pool,
+	}
 }
 
-func (r *SmartRouter) Pick(ctx *core.Context) (*upstream.Upstream, error) {
+func (r *SmartRouter) Pick() (*upstream.Upstream, error) {
+	healthy := r.healthy()
+
+	if len(healthy) == 0 {
+		return nil, fmt.Errorf("no healthy upstreams")
+	}
+
 	// exploration
-	if rand.Float64() < 0.1 {
-		return r.randomHealthy()
+	if rand.Float64() < explorationRate {
+		return healthy[rand.Intn(len(healthy))], nil
 	}
 
 	var best *upstream.Upstream
 	bestScore := -1.0
 
-	for _, u := range r.pool.All() {
-
-		if u.Breaker != nil && !u.Breaker.Allow() {
-			continue
-		}
-
+	for _, u := range healthy {
 		score := Score(u)
 
 		if score > bestScore {
@@ -39,11 +43,21 @@ func (r *SmartRouter) Pick(ctx *core.Context) (*upstream.Upstream, error) {
 		}
 	}
 
-	if best == nil {
-		return nil, fmt.Errorf("no healthy upstream available")
+	return best, nil
+}
+
+func (r *SmartRouter) healthy() []*upstream.Upstream {
+	var healthy []*upstream.Upstream
+
+	for _, u := range r.pool.All() {
+		if u.Breaker != nil && !u.Breaker.Allow() {
+			continue
+		}
+
+		healthy = append(healthy, u)
 	}
 
-	return best, nil
+	return healthy
 }
 
 func Score(u *upstream.Upstream) float64 {
@@ -51,25 +65,7 @@ func Score(u *upstream.Upstream) float64 {
 		return -1
 	}
 
-	lat := u.DecayedLatency()
-	err := u.DecayedError() * 1000
-
-	return 1000 - lat - err
-}
-
-func (r *SmartRouter) randomHealthy() (*upstream.Upstream, error) {
-	var healthy []*upstream.Upstream
-
-	for _, u := range r.pool.All() {
-		if u.Breaker != nil && !u.Breaker.Allow() {
-			continue
-		}
-		healthy = append(healthy, u)
-	}
-
-	if len(healthy) == 0 {
-		return nil, fmt.Errorf("no healthy upstreams")
-	}
-
-	return healthy[rand.Intn(len(healthy))], nil
+	return 1000 -
+		u.LatencyEWMA -
+		(u.ErrorEWMA * 1000)
 }

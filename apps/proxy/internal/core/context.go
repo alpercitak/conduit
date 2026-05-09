@@ -18,7 +18,6 @@ type Context struct {
 	UpstreamURL string
 
 	State State
-	Trace []TraceEvent
 
 	Outcome Outcome
 }

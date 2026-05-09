@@ -1,101 +1,74 @@
 package upstream
 
 import (
-	"math"
+	"net/http/httputil"
+	"net/url"
 	"time"
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/circuit"
 )
 
 const (
-	alphaLatency  = 0.2
-	alphaError    = 0.3
-	decayHalfLife = 30 * time.Second
+	alphaLatency = 0.2
+	alphaError   = 0.3
 )
 
 type Upstream struct {
 	ID      string
 	URL     string
+	Proxy   *httputil.ReverseProxy
 	Breaker *circuit.Breaker
 
 	LatencyEWMA float64
 	ErrorEWMA   float64
 
-	lastUpdate time.Time
+	LastUpdate time.Time
 }
 
-func (u *Upstream) UpdateLatency(d time.Duration) {
+func New(id, rawURL string, breaker *circuit.Breaker) (*Upstream, error) {
+	target, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Upstream{
+		ID:      id,
+		URL:     rawURL,
+		Proxy:   httputil.NewSingleHostReverseProxy(target),
+		Breaker: breaker,
+	}, nil
+}
+
+func (u *Upstream) RecordLatency(d time.Duration) {
 	lat := float64(d.Milliseconds())
 
 	if u.LatencyEWMA == 0 {
 		u.LatencyEWMA = lat
 	} else {
-		u.LatencyEWMA = alphaLatency*lat + (1-alphaLatency)*u.LatencyEWMA
+		u.LatencyEWMA =
+			alphaLatency*lat +
+				(1-alphaLatency)*u.LatencyEWMA
 	}
 
-	u.lastUpdate = time.Now()
+	u.LastUpdate = time.Now()
 }
 
 func (u *Upstream) RecordSuccess() {
-	u.updateError(false)
+	u.recordError(0)
 }
 
 func (u *Upstream) RecordFailure() {
-	u.updateError(true)
+	u.recordError(1)
 }
 
-func (u *Upstream) updateError(failed bool) {
-	var errVal float64
-	if failed {
-		errVal = 1
-	} else {
-		errVal = 0
-	}
-
+func (u *Upstream) recordError(v float64) {
 	if u.ErrorEWMA == 0 {
-		u.ErrorEWMA = errVal
+		u.ErrorEWMA = v
 	} else {
-		u.ErrorEWMA = alphaError*errVal + (1-alphaError)*u.ErrorEWMA
+		u.ErrorEWMA =
+			alphaError*v +
+				(1-alphaError)*u.ErrorEWMA
 	}
 
-	u.lastUpdate = time.Now()
-}
-
-func (u *Upstream) DecayedLatency() float64 {
-	const baseline = 100.0
-
-	factor := decayFactor(u.lastUpdate)
-
-	return baseline + (u.LatencyEWMA-baseline)*factor
-}
-
-func (u *Upstream) DecayedError() float64 {
-	const baseline = 0.0
-
-	factor := decayFactor(u.lastUpdate)
-
-	return baseline + (u.ErrorEWMA-baseline)*factor
-}
-
-func decayFactor(t time.Time) float64 {
-	age := time.Since(t).Seconds()
-	half := decayHalfLife.Seconds()
-
-	return math.Pow(0.5, age/half)
-}
-
-func (u *Upstream) Observe(statusCode int, latency time.Duration) {
-	u.UpdateLatency(latency)
-
-	if statusCode >= 500 {
-		u.RecordFailure()
-		return
-	}
-
-	if statusCode >= 400 {
-		u.RecordFailure()
-		return
-	}
-
-	u.RecordSuccess()
+	u.LastUpdate = time.Now()
 }
