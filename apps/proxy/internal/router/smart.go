@@ -7,7 +7,7 @@ import (
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 )
 
-const explorationRate = 0.1
+const explorationRate = 0.3
 
 type SmartRouter struct {
 	pool *upstream.Pool
@@ -64,8 +64,5 @@ func Score(u *upstream.Upstream) float64 {
 	if u == nil {
 		return -1
 	}
-
-	return 1000 -
-		u.LatencyEWMA -
-		(u.ErrorEWMA * 1000)
+	return 1000 - u.LatencyEWMA - (u.ErrorEWMA * 500)
 }
