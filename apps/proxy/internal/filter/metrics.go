@@ -7,13 +7,12 @@ import (
 	"github.com/alpercitak/conduit/apps/proxy/internal/metrics"
 )
 
-// MetricsFilter records request performance data.
 type MetricsFilter struct {
-	store *metrics.Store
+	m *metrics.Metrics
 }
 
-func NewMetricsFilter(store *metrics.Store) *MetricsFilter {
-	return &MetricsFilter{store: store}
+func NewMetricsFilter(m *metrics.Metrics) *MetricsFilter {
+	return &MetricsFilter{m: m}
 }
 
 func (f *MetricsFilter) Before(ctx *core.Context) error {
@@ -21,11 +20,13 @@ func (f *MetricsFilter) Before(ctx *core.Context) error {
 }
 
 func (f *MetricsFilter) After(ctx *core.Context) error {
-	latency := time.Since(ctx.StartTime)
+	f.m.Requests.Inc()
 
-	success := ctx.StatusCode >= 200 && ctx.StatusCode < 500
+	if ctx.StatusCode >= 500 {
+		f.m.Errors.Inc()
+	}
 
-	f.store.Record(success, latency)
+	f.m.Latency.Observe(time.Since(ctx.StartTime).Seconds())
 
 	return nil
 }

@@ -6,31 +6,31 @@
     {
       "type": "timeseries",
       "title": "Requests per Second",
-      "targets": [{ "expr": "rate(requests_total[1m])" }],
+      "targets": [{ "expr": "rate(conduit_requests_total[1m])" }],
       "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }
     },
     {
       "type": "timeseries",
       "title": "Error Rate",
-      "targets": [{ "expr": "rate(errors_total[1m])" }],
+      "targets": [{ "expr": "rate(conduit_errors_total[1m])" }],
       "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }
     },
     {
       "type": "timeseries",
       "title": "Request Latency (P95)",
-      "targets": [{ "expr": "p95" }],
+      "targets": [{ "expr": "histogram_quantile(0.95, rate(conduit_request_duration_seconds_bucket[1m]))" }],
       "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }
     },
     {
       "type": "timeseries",
       "title": "Request Latency (P99)",
-      "targets": [{ "expr": "p99" }],
+      "targets": [{ "expr": "histogram_quantile(0.99, rate(conduit_request_duration_seconds_bucket[1m]))" }],
       "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 }
     },
     {
       "type": "timeseries",
       "title": "System Load (Requests vs Errors)",
-      "targets": [{ "expr": "rate(requests_total[1m])" }, { "expr": "rate(errors_total[1m])" }],
+      "targets": [{ "expr": "rate(conduit_requests_total[1m])" }, { "expr": "rate(conduit_errors_total[1m])" }],
       "gridPos": { "x": 0, "y": 16, "w": 24, "h": 8 }
     }
   ]

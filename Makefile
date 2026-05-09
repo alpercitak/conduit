@@ -1,7 +1,7 @@
-.PHONY: all dev kill build clean run-proxy upstream1 upstream2 run-simulator run-monitor
+.PHONY: all dev kill build clean run-proxy upstream1 upstream2 run-simulator
 
 DIST := ./dist
-APPS := proxy upstream simulator monitor
+APPS := proxy upstream simulator
 DOCKER_COMPOSE = docker-compose -f infra/docker-compose.yaml
 
 all: build
@@ -24,9 +24,6 @@ run-upstream2:
 
 run-simulator:
 	go run ./apps/simulator/cmd/simulator
-
-run-monitor:
-	go run ./apps/monitor/cmd/monitor
     
 dev: kill
 	concurrently \

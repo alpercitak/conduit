@@ -14,6 +14,7 @@ import (
 	"github.com/alpercitak/conduit/apps/proxy/internal/router"
 	"github.com/alpercitak/conduit/apps/proxy/internal/tracer"
 	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -34,7 +35,7 @@ func main() {
 
 	upstreamPool := upstream.NewPool([]*upstream.Upstream{alpha, beta})
 	smartRouter := router.NewSmart(upstreamPool)
-	metricsStore := metrics.NewStore()
+	metricsStore := metrics.New()
 	filterChain := filter.NewChain(
 		filter.NewLoggingFilter(),
 		filter.NewMetricsFilter(metricsStore),
@@ -45,8 +46,7 @@ func main() {
 	exec := executor.New(smartRouter, inMemoryTracer, filterChain)
 
 	http.HandleFunc("/", exec.Handle)
-	http.HandleFunc("/metrics", metrics.HTTPHandler(metricsStore))
-	http.HandleFunc("/metrics/prometheus", metrics.PrometheusHandler(metricsStore))
+	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/trace", tracer.HTTPHandler(inMemoryTracer))
 
 	log.Println("[conduit] running on :8080")
