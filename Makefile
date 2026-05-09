@@ -1,7 +1,7 @@
 .PHONY: all dev kill build clean run-proxy upstream1 upstream2 run-simulator run-monitor
 
 DIST := ./dist
-APPS := proxy mock-upstream simulator monitor
+APPS := proxy upstream simulator monitor
 DOCKER_COMPOSE = docker-compose -f infra/docker-compose.yaml
 
 all: build
@@ -17,10 +17,10 @@ run-proxy:
 	go run ./apps/proxy/cmd/proxy
 
 run-upstream1:
-	UPSTREAM_NAME=alpha PORT=3001 go run ./apps/mock-upstream/cmd/mock-upstream
+	UPSTREAM_NAME=alpha PORT=3001 go run ./apps/upstream/cmd/upstream
 
 run-upstream2:
-	UPSTREAM_NAME=beta PORT=3002 go run ./apps/mock-upstream/cmd/mock-upstream
+	UPSTREAM_NAME=beta PORT=3002 go run ./apps/upstream/cmd/upstream
 
 run-simulator:
 	go run ./apps/simulator/cmd/simulator

@@ -12,18 +12,18 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
-      - ALPHA_URL=http://mock-upstream-alpha:3001
-      - BETA_URL=http://mock-upstream-beta:3002
+      - ALPHA_URL=http://upstream-alpha:3001
+      - BETA_URL=http://upstream-beta:3002
     depends_on:
-      - mock-upstream-alpha
-      - mock-upstream-beta
+      - upstream-alpha
+      - upstream-beta
 
-  mock-upstream-alpha:
+  upstream-alpha:
     build:
       context: ..
       dockerfile: ./infra/build.Dockerfile
       args:
-        - APP_PATH=mock-upstream
+        - APP_PATH=upstream
         - APP_PORT=3001
     ports:
       - "3001:3001"
@@ -31,12 +31,12 @@ services:
       - PORT=3001
       - UPSTREAM_NAME=alpha
 
-  mock-upstream-beta:
+  upstream-beta:
     build:
       context: ..
       dockerfile: ./infra/build.Dockerfile
       args:
-        - APP_PATH=mock-upstream
+        - APP_PATH=upstream
         - APP_PORT=3002
     ports:
       - "3002:3002"
