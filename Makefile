@@ -44,7 +44,10 @@ clean:
 	rm -rf $(DIST)
 
 dc-up: 
-	$(DOCKER_COMPOSE) up  -d
+	$(DOCKER_COMPOSE) up -d
+
+dc-up-build: 
+	$(DOCKER_COMPOSE) up --build --remove-orphans
 
 dc-down:
 	$(DOCKER_COMPOSE) down

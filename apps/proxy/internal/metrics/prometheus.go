@@ -14,8 +14,8 @@ func PrometheusHandler(store *Store) http.HandlerFunc {
 		fmt.Fprintf(w, "requests_total %d\n", reqs)
 		fmt.Fprintf(w, "errors_total %d\n", errs)
 
-		fmt.Fprintf(w, "latency_p50_ms %d\n", p50.Milliseconds())
-		fmt.Fprintf(w, "latency_p95_ms %d\n", p95.Milliseconds())
-		fmt.Fprintf(w, "latency_p99_ms %d\n", p99.Milliseconds())
+		fmt.Fprintf(w, "p50 %d\n", p50.Milliseconds())
+		fmt.Fprintf(w, "p95 %d\n", p95.Milliseconds())
+		fmt.Fprintf(w, "p99 %d\n", p99.Milliseconds())
 	}
 }

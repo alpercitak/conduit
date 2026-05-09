@@ -47,7 +47,6 @@ func calcPercentile(sorted []time.Duration, p float64) time.Duration {
 	return sorted[idx]
 }
 
-// Summary returns and clears the latency buffer
 func (s *Store) Summary() (p50, p95, p99 time.Duration, reqs, errs int64) {
 	s.mu.Lock()
 
@@ -58,7 +57,6 @@ func (s *Store) Summary() (p50, p95, p99 time.Duration, reqs, errs int64) {
 			atomic.LoadInt64(&s.errors)
 	}
 
-	// snapshot + reset buffer
 	data := append([]time.Duration(nil), s.latencies...)
 	s.latencies = make([]time.Duration, 0, 1024)
 
