@@ -46,6 +46,7 @@ func main() {
 
 	http.HandleFunc("/", exec.Handle)
 	http.HandleFunc("/metrics", metrics.HTTPHandler(metricsStore))
+	http.HandleFunc("/metrics/prometheus", metrics.PrometheusHandler(metricsStore))
 	http.HandleFunc("/trace", tracer.HTTPHandler(inMemoryTracer))
 
 	log.Println("[conduit] running on :8080")
