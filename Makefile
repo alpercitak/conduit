@@ -35,8 +35,10 @@ dev: kill
 		"make run-proxy"
 
 kill:
-	@echo "Cleaning up ports 3001, 3002, 8080..."
-	@lsof -t -i :3001,3002,8080 | xargs kill -9 2>/dev/null || true
+	@echo "Cleaning up ports"
+	@for port in 3001 3002 8080; do \
+		lsof -ti :$$port | xargs -r kill -9; \
+	done
 
 clean:
 	rm -rf $(DIST)
