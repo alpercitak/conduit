@@ -35,15 +35,14 @@ func main() {
 
 	upstreamPool := upstream.NewPool([]*upstream.Upstream{alpha, beta})
 	smartRouter := router.NewSmart(upstreamPool)
-	metricsStore := metrics.New()
+	metrics := metrics.New()
 	filterChain := filter.NewChain(
 		filter.NewLoggingFilter(),
-		filter.NewMetricsFilter(metricsStore),
 		filter.NewResilienceFilter(func(ctx *core.Context) *upstream.Upstream {
 			return upstreamPool.GetByID(ctx.UpstreamID)
 		}),
 	)
-	exec := executor.New(smartRouter, inMemoryTracer, filterChain)
+	exec := executor.New(smartRouter, inMemoryTracer, filterChain, metrics)
 
 	http.HandleFunc("/", exec.Handle)
 	http.Handle("/metrics", promhttp.Handler())

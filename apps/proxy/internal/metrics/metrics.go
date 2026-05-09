@@ -5,25 +5,44 @@ import (
 )
 
 type Metrics struct {
-	Requests prometheus.Counter
-	Errors   prometheus.Counter
-	Latency  prometheus.Histogram
+	Requests *prometheus.CounterVec
+	Errors   *prometheus.CounterVec
+	Latency  *prometheus.HistogramVec
 }
 
 func New() *Metrics {
 	m := &Metrics{
-		Requests: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "conduit_requests_total",
-		}),
-		Errors: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "conduit_errors_total",
-		}),
-		Latency: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Name:    "conduit_request_duration_seconds",
-			Buckets: prometheus.DefBuckets,
-		}),
+		Requests: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "conduit_requests_total",
+				Help: "Total number of requests processed",
+			},
+			[]string{"upstream"},
+		),
+
+		Errors: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "conduit_errors_total",
+				Help: "Total number of failed requests",
+			},
+			[]string{"upstream"},
+		),
+
+		Latency: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "conduit_request_duration_seconds",
+				Help:    "Request latency in seconds",
+				Buckets: prometheus.DefBuckets,
+			},
+			[]string{"upstream"},
+		),
 	}
 
-	prometheus.MustRegister(m.Requests, m.Errors, m.Latency)
+	prometheus.MustRegister(
+		m.Requests,
+		m.Errors,
+		m.Latency,
+	)
+
 	return m
 }

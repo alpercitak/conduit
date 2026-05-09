@@ -1,36 +1,57 @@
 {
   "title": "conduit-proxy",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
+  "refresh": "5s",
   "panels": [
     {
       "type": "timeseries",
-      "title": "Requests per Second",
-      "targets": [{ "expr": "rate(conduit_requests_total[1m])" }],
+      "title": "Requests per Second (by upstream)",
+      "targets": [
+        {
+          "expr": "sum by (upstream) (rate(conduit_requests_total[1m]))"
+        }
+      ],
       "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }
     },
     {
       "type": "timeseries",
-      "title": "Error Rate",
-      "targets": [{ "expr": "rate(conduit_errors_total[1m])" }],
+      "title": "Error Rate (by upstream)",
+      "targets": [
+        {
+          "expr": "sum by (upstream) (rate(conduit_errors_total[1m]))"
+        }
+      ],
       "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }
     },
     {
       "type": "timeseries",
-      "title": "Request Latency (P95)",
-      "targets": [{ "expr": "histogram_quantile(0.95, rate(conduit_request_duration_seconds_bucket[1m]))" }],
+      "title": "P95 Latency (by upstream)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, upstream) (rate(conduit_request_duration_seconds_bucket[1m])))"
+        }
+      ],
       "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }
     },
     {
       "type": "timeseries",
-      "title": "Request Latency (P99)",
-      "targets": [{ "expr": "histogram_quantile(0.99, rate(conduit_request_duration_seconds_bucket[1m]))" }],
+      "title": "P99 Latency (by upstream)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, upstream) (rate(conduit_request_duration_seconds_bucket[1m])))"
+        }
+      ],
       "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 }
     },
     {
       "type": "timeseries",
-      "title": "System Load (Requests vs Errors)",
-      "targets": [{ "expr": "rate(conduit_requests_total[1m])" }, { "expr": "rate(conduit_errors_total[1m])" }],
+      "title": "Traffic Split (alpha vs beta)",
+      "targets": [
+        {
+          "expr": "sum by (upstream) (rate(conduit_requests_total[1m]))"
+        }
+      ],
       "gridPos": { "x": 0, "y": 16, "w": 24, "h": 8 }
     }
   ]

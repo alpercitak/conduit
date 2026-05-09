@@ -6,6 +6,7 @@ import (
 
 	"github.com/alpercitak/conduit/apps/proxy/internal/core"
 	"github.com/alpercitak/conduit/apps/proxy/internal/filter"
+	"github.com/alpercitak/conduit/apps/proxy/internal/metrics"
 	"github.com/alpercitak/conduit/apps/proxy/internal/router"
 )
 
@@ -13,17 +14,20 @@ type Executor struct {
 	router  *router.SmartRouter
 	tracer  core.Tracer
 	filters *filter.Chain
+	metrics *metrics.Metrics
 }
 
 func New(
 	router *router.SmartRouter,
 	tracer core.Tracer,
 	filters *filter.Chain,
+	m *metrics.Metrics,
 ) *Executor {
 	return &Executor{
 		router:  router,
 		tracer:  tracer,
 		filters: filters,
+		metrics: m,
 	}
 }
 
@@ -46,42 +50,37 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 	e.tracer.Mark(ctx, "request_start")
 
 	err := e.filters.Execute(ctx, func(ctx *core.Context) error {
-
-		u, err := e.router.Pick()
+		upstream, err := e.router.Pick()
 		if err != nil {
 			http.Error(w, "no upstream available", http.StatusServiceUnavailable)
-
 			ctx.Outcome = core.OutcomeUpstreamError
-
 			return nil
 		}
 
-		ctx.UpstreamID = u.ID
-		ctx.UpstreamURL = u.URL
+		upstreamId := upstream.ID
+
+		ctx.UpstreamID = upstreamId
+		ctx.UpstreamURL = upstream.URL
 
 		start := time.Now()
 
 		e.tracer.Track(ctx, "proxy", func() {
-			u.Proxy.ServeHTTP(rw, req)
+			upstream.Proxy.ServeHTTP(rw, req)
 		})
 
 		latency := time.Since(start)
 
-		u.RecordLatency(latency)
-
 		ctx.StatusCode = rw.StatusCode
 
-		switch {
-		case rw.StatusCode >= 500:
-			u.RecordFailure()
+		e.metrics.Requests.WithLabelValues(upstreamId).Inc()
+		e.metrics.Latency.WithLabelValues(upstreamId).Observe(latency.Seconds())
+
+		if rw.StatusCode >= 500 {
+			e.metrics.Errors.WithLabelValues(upstreamId).Inc()
 			ctx.Outcome = core.OutcomeUpstreamError
-
-		case rw.StatusCode >= 400:
-			u.RecordFailure()
+		} else if rw.StatusCode >= 400 {
 			ctx.Outcome = core.OutcomeClientError
-
-		default:
-			u.RecordSuccess()
+		} else {
 			ctx.Outcome = core.OutcomeSuccess
 		}
 
