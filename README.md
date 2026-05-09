@@ -8,7 +8,7 @@ A minimal distributed systems lab for exploring adaptive routing, failure handli
 
 Conduit is a self-healing HTTP proxy that routes traffic across multiple upstreams using latency-aware scoring, circuit breakers, and controlled exploration.
 
-It simulates real-world traffic behavior, including failures, latency spikes, and load bursts, while exposing full Prometheus metrics and Grafana dashboards for real-time system visibility.
+It simulates failures, latency spikes, and burst traffic while exposing Prometheus metrics and Grafana dashboards for real-time system visibility.
 
 ---
 
@@ -17,7 +17,7 @@ It simulates real-world traffic behavior, including failures, latency spikes, an
 ### One-command setup (recommended)
 
 ```bash
-make dc-up-build
+make up
 ```
 
 ### Local development (without Docker)

@@ -1,17 +1,20 @@
-.PHONY: all dev kill build clean run-proxy upstream1 upstream2 run-simulator
+.PHONY: all dev kill build clean run-proxy run-upstream1 run-upstream2 run-simulator deps up up-detached down logs help
 
 DIST := ./dist
 APPS := proxy upstream simulator
-DOCKER_COMPOSE = docker-compose -f infra/docker-compose.yaml
+DOCKER_COMPOSE := docker-compose -f infra/docker-compose.yaml
 
 all: build
 
-build: $(APPS)
+build: deps $(APPS)
 
 $(APPS):
-	@echo "Building binary for $@..."
+	@echo "Building $@..."
 	@mkdir -p $(DIST)
-	go build -o $(DIST)/$@ ./apps/$@/cmd/$@
+	@go build -o $(DIST)/$@ ./apps/$@/cmd/$@
+
+deps:
+	@go mod download
 
 run-proxy:
 	go run ./apps/proxy/cmd/proxy
@@ -24,15 +27,15 @@ run-upstream2:
 
 run-simulator:
 	go run ./apps/simulator/cmd/simulator
-    
-dev: kill
-	concurrently \
-		"make run-upstream1" \
-		"make run-upstream2" \
-		"make run-proxy"
+
+dev: kill deps
+	@echo "Starting local development stack..."
+	@$(MAKE) run-upstream1 &
+	@$(MAKE) run-upstream2 &
+	@$(MAKE) run-proxy
 
 kill:
-	@echo "Cleaning up ports"
+	@echo "Cleaning up ports..."
 	@for port in 3001 3002 8080; do \
 		lsof -ti :$$port | xargs -r kill -9; \
 	done
@@ -40,17 +43,22 @@ kill:
 clean:
 	rm -rf $(DIST)
 
-dc-up: 
-	$(DOCKER_COMPOSE) up -d
-
-dc-up-build: 
+up:
 	$(DOCKER_COMPOSE) up --build --remove-orphans
 
-dc-down:
+up-detached:
+	$(DOCKER_COMPOSE) up -d --build --remove-orphans
+
+down:
 	$(DOCKER_COMPOSE) down
 
-dc-build:
-	$(DOCKER_COMPOSE) build
-
-dc-logs:
+logs:
 	$(DOCKER_COMPOSE) logs -f
+
+help:
+	@echo "make up             - run full stack with logs"
+	@echo "make up-detached    - run full stack in background"
+	@echo "make dev            - run local development stack"
+	@echo "make build          - build binaries"
+	@echo "make clean          - remove built artifacts"
+	@echo "make down           - stop docker stack"
