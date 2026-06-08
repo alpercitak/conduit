@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/alpercitak/conduit/apps/proxy/internal/circuit"
+	"proxy/internal/circuit"
 )
 
 const (

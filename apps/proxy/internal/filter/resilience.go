@@ -1,8 +1,8 @@
 package filter
 
 import (
-	"github.com/alpercitak/conduit/apps/proxy/internal/core"
-	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
+	"proxy/internal/core"
+	"proxy/internal/upstream"
 )
 
 type ResilienceFilter struct {

@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/alpercitak/conduit/apps/proxy/internal/core"
+	"proxy/internal/core"
 )
 
 type LoggingFilter struct{}

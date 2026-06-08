@@ -1,3 +1,3 @@
-module github.com/alpercitak/conduit/apps/upstream
+module upstream
 
 go 1.26

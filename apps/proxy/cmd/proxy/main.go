@@ -5,16 +5,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/alpercitak/conduit/apps/proxy/internal/circuit"
-	"github.com/alpercitak/conduit/apps/proxy/internal/config"
-	"github.com/alpercitak/conduit/apps/proxy/internal/core"
-	"github.com/alpercitak/conduit/apps/proxy/internal/executor"
-	"github.com/alpercitak/conduit/apps/proxy/internal/filter"
-	"github.com/alpercitak/conduit/apps/proxy/internal/metrics"
-	"github.com/alpercitak/conduit/apps/proxy/internal/router"
-	"github.com/alpercitak/conduit/apps/proxy/internal/tracer"
-	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"proxy/internal/circuit"
+	"proxy/internal/config"
+	"proxy/internal/core"
+	"proxy/internal/executor"
+	"proxy/internal/filter"
+	"proxy/internal/metrics"
+	"proxy/internal/router"
+	"proxy/internal/tracer"
+	"proxy/internal/upstream"
 )
 
 func main() {

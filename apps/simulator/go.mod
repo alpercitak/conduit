@@ -1,3 +1,3 @@
-module github.com/alpercitak/conduit/apps/simulator
+module simulator
 
 go 1.26

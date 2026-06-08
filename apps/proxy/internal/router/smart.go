@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/alpercitak/conduit/apps/proxy/internal/upstream"
+	"proxy/internal/upstream"
 )
 
 const explorationRate = 0.3

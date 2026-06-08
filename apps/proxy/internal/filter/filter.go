@@ -1,6 +1,6 @@
 package filter
 
-import "github.com/alpercitak/conduit/apps/proxy/internal/core"
+import "proxy/internal/core"
 
 type Filter interface {
 	Before(ctx *core.Context) error

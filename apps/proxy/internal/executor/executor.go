@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/alpercitak/conduit/apps/proxy/internal/core"
-	"github.com/alpercitak/conduit/apps/proxy/internal/filter"
-	"github.com/alpercitak/conduit/apps/proxy/internal/metrics"
-	"github.com/alpercitak/conduit/apps/proxy/internal/router"
+	"proxy/internal/core"
+	"proxy/internal/filter"
+	"proxy/internal/metrics"
+	"proxy/internal/router"
 )
 
 type Executor struct {

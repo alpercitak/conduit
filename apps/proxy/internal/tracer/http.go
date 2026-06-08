@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/alpercitak/conduit/apps/proxy/internal/core"
+	"proxy/internal/core"
 )
 
 func HTTPHandler(t *core.InMemoryTracer) http.HandlerFunc {
