@@ -49,6 +49,7 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/trace", tracer.HTTPHandler(inMemoryTracer))
 
-	log.Println("[conduit] running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	addr := ":" + config.GetEnv("PORT", "8080")
+	log.Println("[conduit] running on " + addr)
+	log.Fatal(http.ListenAndServe(addr, nil))
 }
