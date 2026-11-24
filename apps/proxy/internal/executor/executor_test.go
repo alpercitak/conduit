@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -92,5 +93,27 @@ func TestUnreachableUpstreamCountsAsFailure(t *testing.T) {
 	}
 	if u.Breaker.State() != circuit.Open {
 		t.Fatalf("want OPEN, got %s", u.Breaker.State())
+	}
+}
+
+func TestClientCancelDoesNotCountAgainstUpstream(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	e, u := newExecutor(t, srv.URL)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	rec := httptest.NewRecorder()
+	e.Handle(rec, httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx))
+
+	if rec.Code != upstream.StatusClientClosedRequest {
+		t.Fatalf("want 499, got %d", rec.Code)
+	}
+	if u.Breaker.State() != circuit.Closed {
+		t.Fatalf("want CLOSED, got %s", u.Breaker.State())
+	}
+	if _, errRate := u.Stats(); errRate != 0 {
+		t.Fatalf("want no error recorded, got %v", errRate)
 	}
 }

@@ -1,6 +1,8 @@
 package upstream
 
 import (
+	"log"
+	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"sync"
@@ -12,6 +14,13 @@ import (
 const (
 	alphaLatency = 0.2
 	alphaError   = 0.3
+
+	// responseHeaderTimeout caps how long a hung upstream can hold a request.
+	responseHeaderTimeout = 2 * time.Second
+
+	// StatusClientClosedRequest (nginx's 499) marks requests the client
+	// abandoned. It is below 500, so it doesn't count against the upstream.
+	StatusClientClosedRequest = 499
 )
 
 type Upstream struct {
@@ -33,12 +42,29 @@ func New(id, rawURL string, breaker *circuit.Breaker) (*Upstream, error) {
 		return nil, err
 	}
 
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = responseHeaderTimeout
+	transport.MaxIdleConnsPerHost = 100 // default 2 forces a new connection per request under load
+
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.Transport = transport
+	proxy.ErrorHandler = proxyError
+
 	return &Upstream{
 		ID:      id,
 		URL:     rawURL,
-		Proxy:   httputil.NewSingleHostReverseProxy(target),
+		Proxy:   proxy,
 		Breaker: breaker,
 	}, nil
+}
+
+func proxyError(w http.ResponseWriter, r *http.Request, err error) {
+	if r.Context().Err() != nil {
+		w.WriteHeader(StatusClientClosedRequest)
+		return
+	}
+	log.Printf("proxy error: %v", err)
+	w.WriteHeader(http.StatusBadGateway)
 }
 
 // Record folds one request's latency and outcome into the EWMAs.

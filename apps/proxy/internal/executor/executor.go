@@ -8,6 +8,7 @@ import (
 	"proxy/internal/filter"
 	"proxy/internal/metrics"
 	"proxy/internal/router"
+	"proxy/internal/upstream"
 )
 
 type Executor struct {
@@ -50,29 +51,32 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 	e.tracer.Mark(ctx, "request_start")
 
 	err := e.filters.Execute(ctx, func(ctx *core.Context) error {
-		upstream, err := e.router.Pick()
+		u, err := e.router.Pick()
 		if err != nil {
 			http.Error(w, "no upstream available", http.StatusServiceUnavailable)
 			ctx.Outcome = core.OutcomeUpstreamError
 			return nil
 		}
 
-		upstreamId := upstream.ID
+		upstreamId := u.ID
 
 		ctx.UpstreamID = upstreamId
-		ctx.UpstreamURL = upstream.URL
+		ctx.UpstreamURL = u.URL
 
 		start := time.Now()
 
 		e.tracer.Track(ctx, "proxy", func() {
-			upstream.Proxy.ServeHTTP(rw, req)
+			u.Proxy.ServeHTTP(rw, req)
 		})
 
 		latency := time.Since(start)
 
 		ctx.StatusCode = rw.StatusCode
 
-		upstream.Record(latency, rw.StatusCode >= 500)
+		// An abandoned request says nothing about the upstream's health.
+		if rw.StatusCode != upstream.StatusClientClosedRequest {
+			u.Record(latency, rw.StatusCode >= 500)
+		}
 
 		e.metrics.Requests.WithLabelValues(upstreamId).Inc()
 		e.metrics.Latency.WithLabelValues(upstreamId).Observe(latency.Seconds())

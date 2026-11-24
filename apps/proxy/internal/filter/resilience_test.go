@@ -49,3 +49,14 @@ func TestResilienceIgnoresUnknownUpstream(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestResilienceIgnoresClientCancel(t *testing.T) {
+	f, b := newResilience(t)
+	b.Failure()
+
+	_ = f.After(&core.Context{StatusCode: upstream.StatusClientClosedRequest})
+
+	if b.State() != circuit.Open {
+		t.Fatalf("want OPEN unchanged, got %s", b.State())
+	}
+}
