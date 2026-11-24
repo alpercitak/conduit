@@ -22,19 +22,28 @@ func main() {
 
 	client := &http.Client{Timeout: 3 * time.Second, Transport: transport}
 
-	ticker := time.NewTicker(time.Second)
+	// Spread each second's requests over 10ms slots; firing them all at
+	// once overflows the proxy's accept queue and the local port range.
+	const slotsPerSecond = 100
+
+	ticker := time.NewTicker(time.Second / slotsPerSecond)
 	defer ticker.Stop()
 
+	currentRPS := traffic
+	slot := 0
+
 	for range ticker.C {
-
-		// BURST MODE
-		currentRPS := traffic
-		if rand.Float64() < 0.2 {
-			currentRPS = traffic * 8 // spikes
-			fmt.Println("[SIM] BURST x8")
+		if slot%slotsPerSecond == 0 {
+			// BURST MODE
+			currentRPS = traffic
+			if rand.Float64() < 0.2 {
+				currentRPS = traffic * 8 // spikes
+				fmt.Println("[SIM] BURST x8")
+			}
 		}
+		slot++
 
-		for i := 0; i < currentRPS; i++ {
+		for i := 0; i < currentRPS/slotsPerSecond; i++ {
 			go func(i int) {
 				req, _ := http.NewRequest("GET", proxyURL, nil)
 
