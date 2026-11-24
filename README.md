@@ -96,6 +96,12 @@ Grafana dashboards provide:
 - Error rate per upstream
 - Request latency (P95 / P99)
 - System-wide traffic distribution
+- Breaker state per upstream (closed / half-open / open)
+- Routing score per upstream (higher wins)
+
+Requests rejected because every breaker is open count under `upstream="none"`.
+
+Per-upstream routing inputs are exported as gauges: `conduit_breaker_state` (0 closed, 1 half-open, 2 open), `conduit_upstream_latency_ewma_ms`, `conduit_upstream_error_ewma` and `conduit_upstream_score`.
 
 You can observe routing decisions shifting in real time as upstream latency or error rates change.
 
@@ -153,6 +159,37 @@ Behavior:
 - Degraded upstreams gradually lose traffic
 - Failing upstreams are isolated automatically
 - Occasional exploration ensures recovery detection
+
+### Circuit breaker
+
+Each upstream's breaker tracks an error-rate EWMA over roughly the last 20 requests and opens when it reaches 50%. It trips on a rate rather than N failures in a row, so a steadily flaky upstream under heavy traffic stays in rotation, while a sharply degraded one is cut off.
+
+After 10s open, one probe request is let through (half-open). Success closes the breaker and resets its error rate; failure reopens it.
+
+---
+
+## Failure injection
+
+Upstreams misbehave on purpose, configured by environment variables:
+
+| Variable | Meaning |
+| -------- | ------- |
+| `LATENCY_MS` | Base delay per response |
+| `JITTER_MS` | Extra random delay, up to this much |
+| `ERROR_RATE` | Share of responses that return 500 (0..1) |
+| `DEGRADE_EVERY` | Length of the degradation cycle, e.g. `90s` |
+| `DEGRADE_FOR` | How long each cycle starts degraded, e.g. `30s` |
+| `DEGRADED_LATENCY_MS` | Delay added while degraded |
+| `DEGRADED_ERROR_RATE` | Error rate while degraded (replaces `ERROR_RATE`) |
+
+The default stack (`make up` / `make dev`) runs:
+
+- **alpha**: fast and stable (30–80ms, 1% errors), but degraded for the first 30s of every 90s (+300ms, 60% errors)
+- **beta**: slow and flaky all the time (200–1000ms, 15% errors)
+
+What to watch in Grafana: while alpha is degraded its breaker opens and traffic moves to beta; when the phase ends a probe succeeds, the breaker closes and alpha wins traffic back on score. Beta stays in rotation throughout.
+
+The simulator sends 500 requests/s, with random 8x bursts, spread evenly across each second.
 
 This creates a feedback loop where routing decisions continuously reinforce observed performance.
 
