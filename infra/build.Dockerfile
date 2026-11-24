@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o /bin/app \
     ./apps/${APP_PATH}/cmd/${APP_PATH}/main.go
 
-FROM alpine:latest
+FROM alpine:3.24
 RUN apk --no-cache add ca-certificates
 RUN adduser -D conduituser
 USER conduituser

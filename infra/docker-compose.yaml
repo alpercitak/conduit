@@ -59,7 +59,7 @@ services:
       - proxy
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.16.0
     ports:
       - "9090:9090"
     volumes:
@@ -68,7 +68,7 @@ services:
       - proxy
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.3.2
     ports:
       - "3000:3000"
     depends_on:
