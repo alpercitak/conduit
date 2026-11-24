@@ -19,10 +19,4 @@ USER conduituser
 
 COPY --from=builder /bin/app /app
 
-ARG APP_PORT
-
-ENV PORT=${APP_PORT}
-
-EXPOSE ${PORT}
-
 ENTRYPOINT ["/app"]

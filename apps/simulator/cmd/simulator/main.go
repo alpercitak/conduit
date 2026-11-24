@@ -5,13 +5,15 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"os"
 	"time"
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
-	proxyURL := "http://localhost:8080/"
+	proxyURL := os.Getenv("PROXY_URL")
+	if proxyURL == "" {
+		proxyURL = "http://localhost:8080/"
+	}
 
 	traffic := 500 // base RPS
 

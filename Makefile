@@ -32,6 +32,7 @@ dev: kill deps
 	@echo "Starting local development stack..."
 	@$(MAKE) run-upstream1 &
 	@$(MAKE) run-upstream2 &
+	@$(MAKE) run-simulator &
 	@$(MAKE) run-proxy
 
 kill:
