@@ -7,6 +7,11 @@ import (
 
 type State string
 
+// errorAlpha weights each result in the error-rate EWMA (~20-request memory).
+// Tripping on a rate, not N failures in a row, keeps a steadily flaky
+// upstream from opening just because it gets a lot of traffic.
+const errorAlpha = 0.05
+
 const (
 	Closed   State = "CLOSED"
 	Open     State = "OPEN"
@@ -18,11 +23,11 @@ type Breaker struct {
 
 	state State
 
-	failureCount int
+	errorRate    float64 // EWMA, 0..1
 	lastFailTime time.Time
 
-	failureThreshold int
-	retryTimeout     time.Duration
+	errorThreshold float64
+	retryTimeout   time.Duration
 
 	// probeStart is when the in-flight half-open probe was handed out.
 	// Zero means no probe is in flight.
@@ -31,12 +36,14 @@ type Breaker struct {
 	now func() time.Time
 }
 
-func New(failureThreshold int, retryTimeout time.Duration) *Breaker {
+// New returns a breaker that opens once the error-rate EWMA reaches
+// errorThreshold (0..1) and retries after retryTimeout.
+func New(errorThreshold float64, retryTimeout time.Duration) *Breaker {
 	return &Breaker{
-		state:            Closed,
-		failureThreshold: failureThreshold,
-		retryTimeout:     retryTimeout,
-		now:              time.Now,
+		state:          Closed,
+		errorThreshold: errorThreshold,
+		retryTimeout:   retryTimeout,
+		now:            time.Now,
 	}
 }
 
@@ -90,8 +97,18 @@ func (b *Breaker) Success() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.state = Closed
-	b.failureCount = 0
+	// A request sent before the breaker opened can still finish OK.
+	// Only a half-open probe may close an open breaker.
+	if b.state == Open {
+		return
+	}
+
+	if b.state == HalfOpen {
+		b.state = Closed
+		b.errorRate = 0 // start fresh, or the old rate re-trips it at once
+	} else {
+		b.errorRate *= 1 - errorAlpha
+	}
 	b.probeStart = time.Time{}
 }
 
@@ -99,11 +116,16 @@ func (b *Breaker) Failure() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.failureCount++
 	b.lastFailTime = b.now()
 	b.probeStart = time.Time{}
 
-	if b.state == HalfOpen || b.failureCount >= b.failureThreshold {
+	switch b.state {
+	case HalfOpen:
 		b.state = Open
+	case Closed:
+		b.errorRate = errorAlpha + (1-errorAlpha)*b.errorRate
+		if b.errorRate >= b.errorThreshold {
+			b.state = Open
+		}
 	}
 }

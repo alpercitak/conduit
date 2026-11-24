@@ -10,18 +10,20 @@ type clock struct{ t time.Time }
 func (c *clock) now() time.Time          { return c.t }
 func (c *clock) advance(d time.Duration) { c.t = c.t.Add(d) }
 
-func newTestBreaker(threshold int, timeout time.Duration) (*Breaker, *clock) {
+func newTestBreaker(threshold float64, timeout time.Duration) (*Breaker, *clock) {
 	c := &clock{t: time.Unix(0, 0)}
 	b := New(threshold, timeout)
 	b.now = c.now
 	return b, c
 }
 
-func TestOpensAfterThreshold(t *testing.T) {
-	b, _ := newTestBreaker(3, time.Second)
+func TestOpensWhenErrorRateCrossesThreshold(t *testing.T) {
+	b, _ := newTestBreaker(0.5, time.Second)
 
-	b.Failure()
-	b.Failure()
+	// From a clean start the EWMA passes 0.5 on the 14th straight failure.
+	for range 13 {
+		b.Failure()
+	}
 	if !b.Allow() {
 		t.Fatal("should allow below threshold")
 	}
@@ -31,8 +33,24 @@ func TestOpensAfterThreshold(t *testing.T) {
 	}
 }
 
+func TestSteadyLowErrorRateStaysClosed(t *testing.T) {
+	b, _ := newTestBreaker(0.5, time.Second)
+
+	// 20% errors, with runs of 5 failures that would trip a count-based breaker.
+	for i := range 10000 {
+		if i%25 < 5 {
+			b.Failure()
+		} else {
+			b.Success()
+		}
+	}
+	if b.State() != Closed {
+		t.Fatalf("want CLOSED at a steady 20%% error rate, got %s", b.State())
+	}
+}
+
 func TestAvailableDoesNotConsumeProbe(t *testing.T) {
-	b, c := newTestBreaker(1, time.Second)
+	b, c := newTestBreaker(0.01, time.Second)
 	b.Failure()
 	c.advance(2 * time.Second)
 
@@ -53,7 +71,7 @@ func TestAvailableDoesNotConsumeProbe(t *testing.T) {
 }
 
 func TestProbeSuccessCloses(t *testing.T) {
-	b, c := newTestBreaker(1, time.Second)
+	b, c := newTestBreaker(0.01, time.Second)
 	b.Failure()
 	c.advance(2 * time.Second)
 	b.Allow()
@@ -65,10 +83,8 @@ func TestProbeSuccessCloses(t *testing.T) {
 }
 
 func TestProbeFailureReopens(t *testing.T) {
-	b, c := newTestBreaker(3, time.Second)
-	for range 3 {
-		b.Failure()
-	}
+	b, c := newTestBreaker(0.01, time.Second)
+	b.Failure()
 	c.advance(2 * time.Second)
 	b.Allow()
 
@@ -79,7 +95,7 @@ func TestProbeFailureReopens(t *testing.T) {
 }
 
 func TestLostProbeIsReissued(t *testing.T) {
-	b, c := newTestBreaker(1, time.Second)
+	b, c := newTestBreaker(0.01, time.Second)
 	b.Failure()
 	c.advance(2 * time.Second)
 	b.Allow() // probe never reports back
@@ -87,5 +103,16 @@ func TestLostProbeIsReissued(t *testing.T) {
 	c.advance(2 * time.Second)
 	if !b.Allow() {
 		t.Fatal("a probe that never reported should be reissued after retryTimeout")
+	}
+}
+
+func TestLateSuccessDoesNotCloseOpenBreaker(t *testing.T) {
+	b, _ := newTestBreaker(0.01, time.Second)
+	b.Failure()
+
+	b.Success() // in-flight request that started before the breaker opened
+
+	if b.State() != Open {
+		t.Fatalf("want OPEN, got %s", b.State())
 	}
 }

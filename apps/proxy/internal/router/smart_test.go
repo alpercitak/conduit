@@ -60,7 +60,7 @@ func TestVerySlowUpstreamsStillPicked(t *testing.T) {
 }
 
 func TestSkipsOpenBreaker(t *testing.T) {
-	br := circuit.New(1, time.Hour)
+	br := circuit.New(0.01, time.Hour)
 	br.Failure()
 	a := newUpstream(t, "alpha", br)
 	b := newUpstream(t, "beta", nil)
@@ -73,7 +73,7 @@ func TestSkipsOpenBreaker(t *testing.T) {
 }
 
 func TestNoneAvailable(t *testing.T) {
-	br := circuit.New(1, time.Hour)
+	br := circuit.New(0.01, time.Hour)
 	br.Failure()
 
 	if _, err := newRouter(newUpstream(t, "alpha", br)).Pick(); err == nil {
@@ -84,7 +84,7 @@ func TestNoneAvailable(t *testing.T) {
 // Regression: checking a half-open upstream that isn't picked must not use
 // up its probe, otherwise it is excluded forever.
 func TestUnpickedRecoveringUpstreamIsNotStranded(t *testing.T) {
-	br := circuit.New(1, 10*time.Millisecond)
+	br := circuit.New(0.01, 10*time.Millisecond)
 	br.Failure()
 	a := newUpstream(t, "alpha", nil)
 	b := newUpstream(t, "beta", br)

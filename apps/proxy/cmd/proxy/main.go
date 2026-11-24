@@ -24,12 +24,12 @@ func main() {
 	alphaURL := config.GetEnv("ALPHA_URL", "http://localhost:3001")
 	betaURL := config.GetEnv("BETA_URL", "http://localhost:3002")
 
-	alpha, err := upstream.New("alpha", alphaURL, circuit.New(5, 10*time.Second))
+	alpha, err := upstream.New("alpha", alphaURL, circuit.New(0.5, 10*time.Second))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	beta, err := upstream.New("beta", betaURL, circuit.New(5, 10*time.Second))
+	beta, err := upstream.New("beta", betaURL, circuit.New(0.5, 10*time.Second))
 	if err != nil {
 		log.Fatal(err)
 	}

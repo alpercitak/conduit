@@ -24,7 +24,7 @@ var testMetrics = metrics.New()
 // newExecutor wires a single upstream the same way cmd/proxy does.
 func newExecutor(t *testing.T, url string) (*Executor, *upstream.Upstream) {
 	t.Helper()
-	u, err := upstream.New("alpha", url, circuit.New(1, time.Hour))
+	u, err := upstream.New("alpha", url, circuit.New(0.01, time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
