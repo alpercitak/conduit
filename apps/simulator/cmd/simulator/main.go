@@ -2,35 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
-	"sync"
 	"time"
 )
-
-type Profile struct {
-	Name          string
-	URL           string
-	LatencyBase   time.Duration
-	LatencyJitter time.Duration
-	ErrorRate     float64
-}
-
-func (p Profile) Do(req *http.Request) (*http.Response, error) {
-	// simulate latency
-	lat := p.LatencyBase + time.Duration(rand.Int63n(int64(p.LatencyJitter)))
-	time.Sleep(lat)
-
-	// simulate failure
-	if rand.Float64() < p.ErrorRate {
-		return nil, fmt.Errorf("simulated upstream failure: %s", p.Name)
-	}
-
-	return &http.Response{
-		StatusCode: 200,
-		Body:       http.NoBody,
-	}, nil
-}
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -39,23 +15,10 @@ func main() {
 
 	traffic := 500 // base RPS
 
-	// alpha := Profile{
-	// 	Name:          "alpha",
-	// 	LatencyBase:   30 * time.Millisecond,
-	// 	LatencyJitter: 50 * time.Millisecond,
-	// 	ErrorRate:     0.01,
-	// }
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConnsPerHost = 1000 // default 2 opens a new connection per request
 
-	// beta := Profile{
-	// 	Name:          "beta",
-	// 	LatencyBase:   200 * time.Millisecond,
-	// 	LatencyJitter: 800 * time.Millisecond,
-	// 	ErrorRate:     0.15,
-	// }
-
-	client := &http.Client{Timeout: 3 * time.Second}
-
-	var wg sync.WaitGroup
+	client := &http.Client{Timeout: 3 * time.Second, Transport: transport}
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -70,11 +33,7 @@ func main() {
 		}
 
 		for i := 0; i < currentRPS; i++ {
-			wg.Add(1)
-
 			go func(i int) {
-				defer wg.Done()
-
 				req, _ := http.NewRequest("GET", proxyURL, nil)
 
 				// just random noise header
@@ -89,6 +48,8 @@ func main() {
 					return
 				}
 
+				// Drain so the connection can be reused.
+				_, _ = io.Copy(io.Discard, resp.Body)
 				_ = resp.Body.Close()
 
 				if lat > 500*time.Millisecond {
@@ -96,7 +57,5 @@ func main() {
 				}
 			}(i)
 		}
-
-		wg.Wait()
 	}
 }
