@@ -20,10 +20,10 @@ run-proxy:
 	go run ./apps/proxy/cmd/proxy
 
 run-upstream1:
-	UPSTREAM_NAME=alpha PORT=3001 go run ./apps/upstream/cmd/upstream
+	UPSTREAM_NAME=alpha PORT=3001 LATENCY_MS=30 JITTER_MS=50 ERROR_RATE=0.01 go run ./apps/upstream/cmd/upstream
 
 run-upstream2:
-	UPSTREAM_NAME=beta PORT=3002 go run ./apps/upstream/cmd/upstream
+	UPSTREAM_NAME=beta PORT=3002 LATENCY_MS=200 JITTER_MS=800 ERROR_RATE=0.15 go run ./apps/upstream/cmd/upstream
 
 run-simulator:
 	go run ./apps/simulator/cmd/simulator

@@ -30,6 +30,9 @@ services:
     environment:
       - PORT=3001
       - UPSTREAM_NAME=alpha
+      - LATENCY_MS=30
+      - JITTER_MS=50
+      - ERROR_RATE=0.01
 
   upstream-beta:
     build:
@@ -43,6 +46,9 @@ services:
     environment:
       - PORT=3002
       - UPSTREAM_NAME=beta
+      - LATENCY_MS=200
+      - JITTER_MS=800
+      - ERROR_RATE=0.15
 
   prometheus:
     image: prom/prometheus:latest
