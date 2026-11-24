@@ -24,7 +24,11 @@ type Breaker struct {
 	failureThreshold int
 	retryTimeout     time.Duration
 
-	halfOpenAllowed bool
+	// probeStart is when the in-flight half-open probe was handed out.
+	// Zero means no probe is in flight.
+	probeStart time.Time
+
+	now func() time.Time
 }
 
 func New(failureThreshold int, retryTimeout time.Duration) *Breaker {
@@ -32,33 +36,54 @@ func New(failureThreshold int, retryTimeout time.Duration) *Breaker {
 		state:            Closed,
 		failureThreshold: failureThreshold,
 		retryTimeout:     retryTimeout,
+		now:              time.Now,
 	}
 }
 
+// Available reports whether Allow would succeed right now, without
+// changing state. Use it to filter candidates; call Allow only for the
+// upstream that will actually receive the request.
+func (b *Breaker) Available() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.canPass()
+}
+
+// Allow claims permission to send a request. In half-open state only one
+// probe is handed out until Success or Failure is reported (or the probe
+// times out, so a lost probe can't strand the upstream).
 func (b *Breaker) Allow() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	if !b.canPass() {
+		return false
+	}
+
+	if b.state == Open {
+		b.state = HalfOpen
+	}
+	if b.state == HalfOpen {
+		b.probeStart = b.now()
+	}
+	return true
+}
+
+func (b *Breaker) canPass() bool {
 	switch b.state {
-
 	case Open:
-		if time.Since(b.lastFailTime) > b.retryTimeout {
-			b.state = HalfOpen
-			b.halfOpenAllowed = true
-			return true
-		}
-		return false
-
+		return b.now().Sub(b.lastFailTime) > b.retryTimeout
 	case HalfOpen:
-		if b.halfOpenAllowed {
-			b.halfOpenAllowed = false
-			return true
-		}
-		return false
-
+		return b.probeStart.IsZero() || b.now().Sub(b.probeStart) > b.retryTimeout
 	default:
 		return true
 	}
+}
+
+func (b *Breaker) State() State {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.state
 }
 
 func (b *Breaker) Success() {
@@ -67,7 +92,7 @@ func (b *Breaker) Success() {
 
 	b.state = Closed
 	b.failureCount = 0
-	b.halfOpenAllowed = false
+	b.probeStart = time.Time{}
 }
 
 func (b *Breaker) Failure() {
@@ -75,11 +100,10 @@ func (b *Breaker) Failure() {
 	defer b.mu.Unlock()
 
 	b.failureCount++
-	b.lastFailTime = time.Now()
+	b.lastFailTime = b.now()
+	b.probeStart = time.Time{}
 
-	b.halfOpenAllowed = false
-
-	if b.failureCount >= b.failureThreshold {
+	if b.state == HalfOpen || b.failureCount >= b.failureThreshold {
 		b.state = Open
 	}
 }

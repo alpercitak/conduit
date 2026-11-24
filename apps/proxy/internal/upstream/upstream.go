@@ -3,6 +3,7 @@ package upstream
 import (
 	"net/http/httputil"
 	"net/url"
+	"sync"
 	"time"
 
 	"proxy/internal/circuit"
@@ -19,10 +20,11 @@ type Upstream struct {
 	Proxy   *httputil.ReverseProxy
 	Breaker *circuit.Breaker
 
-	LatencyEWMA float64
-	ErrorEWMA   float64
-
-	LastUpdate time.Time
+	mu          sync.RWMutex
+	latencyEWMA float64 // milliseconds
+	errorEWMA   float64 // 0..1
+	hasLatency  bool
+	lastUpdate  time.Time
 }
 
 func New(id, rawURL string, breaker *circuit.Breaker) (*Upstream, error) {
@@ -39,36 +41,35 @@ func New(id, rawURL string, breaker *circuit.Breaker) (*Upstream, error) {
 	}, nil
 }
 
-func (u *Upstream) RecordLatency(d time.Duration) {
-	lat := float64(d.Milliseconds())
+// Record folds one request's latency and outcome into the EWMAs.
+func (u *Upstream) Record(d time.Duration, failed bool) {
+	lat := float64(d) / float64(time.Millisecond)
 
-	if u.LatencyEWMA == 0 {
-		u.LatencyEWMA = lat
-	} else {
-		u.LatencyEWMA =
-			alphaLatency*lat +
-				(1-alphaLatency)*u.LatencyEWMA
+	errVal := 0.0
+	if failed {
+		errVal = 1
 	}
 
-	u.LastUpdate = time.Now()
-}
+	u.mu.Lock()
+	defer u.mu.Unlock()
 
-func (u *Upstream) RecordSuccess() {
-	u.recordError(0)
-}
-
-func (u *Upstream) RecordFailure() {
-	u.recordError(1)
-}
-
-func (u *Upstream) recordError(v float64) {
-	if u.ErrorEWMA == 0 {
-		u.ErrorEWMA = v
+	if !u.hasLatency {
+		u.latencyEWMA = lat
+		u.hasLatency = true
 	} else {
-		u.ErrorEWMA =
-			alphaError*v +
-				(1-alphaError)*u.ErrorEWMA
+		u.latencyEWMA = alphaLatency*lat + (1-alphaLatency)*u.latencyEWMA
 	}
 
-	u.LastUpdate = time.Now()
+	// Error rate starts at a prior of 0 (healthy), so a single failure
+	// moves it by alphaError instead of jumping straight to 1.
+	u.errorEWMA = alphaError*errVal + (1-alphaError)*u.errorEWMA
+
+	u.lastUpdate = time.Now()
+}
+
+// Stats returns the current latency EWMA (ms) and error-rate EWMA.
+func (u *Upstream) Stats() (latencyMs, errorRate float64) {
+	u.mu.RLock()
+	defer u.mu.RUnlock()
+	return u.latencyEWMA, u.errorEWMA
 }

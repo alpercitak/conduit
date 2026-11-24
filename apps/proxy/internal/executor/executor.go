@@ -72,6 +72,8 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 
 		ctx.StatusCode = rw.StatusCode
 
+		upstream.Record(latency, rw.StatusCode >= 500)
+
 		e.metrics.Requests.WithLabelValues(upstreamId).Inc()
 		e.metrics.Latency.WithLabelValues(upstreamId).Observe(latency.Seconds())
 
