@@ -22,4 +22,8 @@ jobs:
 
       - run: go work sync
 
+      - run: go vet proxy/... simulator/... upstream/...
+
+      - run: go test -race proxy/...
+
       - run: make -j$(nproc) build
