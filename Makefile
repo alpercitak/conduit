@@ -20,7 +20,9 @@ run-proxy:
 	go run ./apps/proxy/cmd/proxy
 
 run-upstream1:
-	UPSTREAM_NAME=alpha PORT=3001 LATENCY_MS=30 JITTER_MS=50 ERROR_RATE=0.01 go run ./apps/upstream/cmd/upstream
+	UPSTREAM_NAME=alpha PORT=3001 LATENCY_MS=30 JITTER_MS=50 ERROR_RATE=0.01 \
+		DEGRADE_EVERY=90s DEGRADE_FOR=30s DEGRADED_LATENCY_MS=300 DEGRADED_ERROR_RATE=0.6 \
+		go run ./apps/upstream/cmd/upstream
 
 run-upstream2:
 	UPSTREAM_NAME=beta PORT=3002 LATENCY_MS=200 JITTER_MS=800 ERROR_RATE=0.15 go run ./apps/upstream/cmd/upstream
