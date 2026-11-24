@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-type State map[string]any
-
 type Context struct {
 	RequestID string
 	StartTime time.Time
@@ -14,10 +12,7 @@ type Context struct {
 
 	StatusCode int
 
-	UpstreamID  string
-	UpstreamURL string
-
-	State State
+	UpstreamID string
 
 	Outcome Outcome
 }

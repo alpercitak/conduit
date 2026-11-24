@@ -25,7 +25,6 @@ const (
 
 type Upstream struct {
 	ID      string
-	URL     string
 	Proxy   *httputil.ReverseProxy
 	Breaker *circuit.Breaker
 
@@ -33,7 +32,6 @@ type Upstream struct {
 	latencyEWMA float64 // milliseconds
 	errorEWMA   float64 // 0..1
 	hasLatency  bool
-	lastUpdate  time.Time
 }
 
 func New(id, rawURL string, breaker *circuit.Breaker) (*Upstream, error) {
@@ -52,7 +50,6 @@ func New(id, rawURL string, breaker *circuit.Breaker) (*Upstream, error) {
 
 	return &Upstream{
 		ID:      id,
-		URL:     rawURL,
 		Proxy:   proxy,
 		Breaker: breaker,
 	}, nil
@@ -89,8 +86,6 @@ func (u *Upstream) Record(d time.Duration, failed bool) {
 	// Error rate starts at a prior of 0 (healthy), so a single failure
 	// moves it by alphaError instead of jumping straight to 1.
 	u.errorEWMA = alphaError*errVal + (1-alphaError)*u.errorEWMA
-
-	u.lastUpdate = time.Now()
 }
 
 // Stats returns the current latency EWMA (ms) and error-rate EWMA.

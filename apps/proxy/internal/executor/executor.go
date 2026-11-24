@@ -43,7 +43,6 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 		RequestID: core.NewRequestID(),
 		StartTime: time.Now(),
 		Request:   req,
-		State:     make(core.State),
 	}
 
 	defer e.finalize(ctx)
@@ -61,7 +60,6 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 		upstreamId := u.ID
 
 		ctx.UpstreamID = upstreamId
-		ctx.UpstreamURL = u.URL
 
 		start := time.Now()
 
