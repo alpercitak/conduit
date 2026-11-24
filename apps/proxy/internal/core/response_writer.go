@@ -5,6 +5,8 @@ import "net/http"
 type ResponseWriter struct {
 	http.ResponseWriter
 	StatusCode int
+
+	wroteHeader bool
 }
 
 func NewResponseWriter(w http.ResponseWriter) *ResponseWriter {
@@ -14,10 +16,21 @@ func NewResponseWriter(w http.ResponseWriter) *ResponseWriter {
 	}
 }
 
+// WriteHeader records the first final status. 1xx informational headers
+// (forwarded by ReverseProxy) pass through without fixing the status.
 func (rw *ResponseWriter) WriteHeader(code int) {
-	if rw.StatusCode != 200 {
+	if rw.wroteHeader {
 		return
 	}
-	rw.StatusCode = code
+	if code >= 200 {
+		rw.StatusCode = code
+		rw.wroteHeader = true
+	}
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+// Write without a prior WriteHeader sends an implicit 200.
+func (rw *ResponseWriter) Write(b []byte) (int, error) {
+	rw.wroteHeader = true
+	return rw.ResponseWriter.Write(b)
 }
