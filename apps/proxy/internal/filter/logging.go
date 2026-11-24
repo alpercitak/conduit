@@ -14,12 +14,13 @@ func NewLoggingFilter() *LoggingFilter {
 }
 
 func (f *LoggingFilter) Before(ctx *core.Context) error {
-	log.Printf("[start] %s %s", ctx.RequestID, ctx.Request.URL.Path)
 	return nil
 }
 
+// After logs one line per request; the ID is the key for /trace?id=.
 func (f *LoggingFilter) After(ctx *core.Context) error {
-	duration := time.Since(ctx.StartTime)
-	log.Printf("[end] %s took=%s", ctx.RequestID, duration)
+	log.Printf("%s %s %s upstream=%s status=%d took=%s",
+		ctx.RequestID, ctx.Request.Method, ctx.Request.URL.Path,
+		ctx.UpstreamID, ctx.StatusCode, time.Since(ctx.StartTime))
 	return nil
 }
