@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
+
 	"proxy/internal/circuit"
 	"proxy/internal/core"
 	"proxy/internal/filter"
@@ -76,8 +78,12 @@ func TestUpstream5xxOpensBreakerAndStopsRouting(t *testing.T) {
 	if u.Breaker.State() != circuit.Open {
 		t.Fatalf("want OPEN, got %s", u.Breaker.State())
 	}
+	before := testutil.ToFloat64(testMetrics.Errors.WithLabelValues(noUpstream))
 	if rec := serve(e); rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("second request: want 503, got %d", rec.Code)
+	}
+	if got := testutil.ToFloat64(testMetrics.Errors.WithLabelValues(noUpstream)); got != before+1 {
+		t.Fatalf("want rejected request counted as error, got %v -> %v", before, got)
 	}
 }
 

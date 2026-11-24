@@ -11,6 +11,9 @@ import (
 	"proxy/internal/upstream"
 )
 
+// noUpstream labels requests rejected because every breaker is open.
+const noUpstream = "none"
+
 type Executor struct {
 	router  *router.SmartRouter
 	tracer  core.Tracer
@@ -53,7 +56,10 @@ func (e *Executor) Handle(w http.ResponseWriter, req *http.Request) {
 		u, err := e.router.Pick()
 		if err != nil {
 			http.Error(w, "no upstream available", http.StatusServiceUnavailable)
+			ctx.StatusCode = http.StatusServiceUnavailable
 			ctx.Outcome = core.OutcomeUpstreamError
+			e.metrics.Requests.WithLabelValues(noUpstream).Inc()
+			e.metrics.Errors.WithLabelValues(noUpstream).Inc()
 			return nil
 		}
 
