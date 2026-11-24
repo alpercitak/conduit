@@ -14,21 +14,37 @@ type TraceEvent struct {
 type Tracer interface {
 	Mark(ctx *Context, name string)
 	Track(ctx *Context, name string, fn func())
-	Flush(ctx *Context) []TraceEvent
 }
+
+// maxTraces bounds memory: only the most recent request IDs are kept.
+const maxTraces = 10000
 
 type InMemoryTracer struct {
 	traces map[string][]TraceEvent
 	mu     sync.Mutex
+
+	limit int
+	order []string // ring of IDs in insertion order
+	next  int      // oldest slot once the ring is full
 }
 
 func NewInMemoryTracer() *InMemoryTracer {
 	return &InMemoryTracer{
 		traces: make(map[string][]TraceEvent),
+		limit:  maxTraces,
 	}
 }
 
 func (t *InMemoryTracer) append(id string, evt TraceEvent) {
+	if _, ok := t.traces[id]; !ok {
+		if len(t.order) < t.limit {
+			t.order = append(t.order, id)
+		} else {
+			delete(t.traces, t.order[t.next])
+			t.order[t.next] = id
+			t.next = (t.next + 1) % t.limit
+		}
+	}
 	t.traces[id] = append(t.traces[id], evt)
 }
 
@@ -60,17 +76,4 @@ func (t *InMemoryTracer) Get(id string) ([]TraceEvent, bool) {
 
 	trace, ok := t.traces[id]
 	return trace, ok
-}
-
-func (t *InMemoryTracer) Flush(ctx *Context) []TraceEvent {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	events, ok := t.traces[ctx.RequestID]
-	if !ok {
-		return nil
-	}
-
-	delete(t.traces, ctx.RequestID)
-	return events
 }
