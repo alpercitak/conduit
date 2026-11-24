@@ -162,9 +162,24 @@ Behavior:
 
 ### Circuit breaker
 
-Each upstream's breaker tracks an error-rate EWMA over roughly the last 20 requests and opens when it reaches 50%. It trips on a rate rather than N failures in a row, so a steadily flaky upstream under heavy traffic stays in rotation, while a sharply degraded one is cut off.
+Each upstream's breaker tracks an error-rate EWMA over roughly the last 20 requests and opens when it reaches 50% (default). It trips on a rate rather than N failures in a row, so a steadily flaky upstream under heavy traffic stays in rotation, while a sharply degraded one is cut off.
 
-After 10s open, one probe request is let through (half-open). Success closes the breaker and resets its error rate; failure reopens it.
+After 10s open (default), one probe request is let through (half-open). Success closes the breaker and resets its error rate; failure reopens it.
+
+### Proxy settings
+
+Tune the proxy with environment variables, no rebuild needed:
+
+| Variable | Default | Meaning |
+| -------- | ------- | ------- |
+| `BREAKER_ERROR_THRESHOLD` | `0.5` | Error-rate EWMA (0..1) at which a breaker opens |
+| `BREAKER_RETRY_TIMEOUT` | `10s` | How long a breaker stays open before a probe |
+| `EXPLORATION_RATE` | `0.3` | Share of requests routed to a random available upstream |
+| `UPSTREAM_TIMEOUT` | `2s` | Max wait for an upstream's response headers before 502 |
+| `ALPHA_URL` / `BETA_URL` | `http://localhost:3001` / `:3002` | Upstream addresses |
+| `PORT` | `8080` | Listen port |
+
+The proxy logs the values it uses on startup and exits on a malformed one.
 
 ---
 

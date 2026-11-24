@@ -24,7 +24,7 @@ var testMetrics = metrics.New()
 // newExecutor wires a single upstream the same way cmd/proxy does.
 func newExecutor(t *testing.T, url string) (*Executor, *upstream.Upstream) {
 	t.Helper()
-	u, err := upstream.New("alpha", url, circuit.New(0.01, time.Hour))
+	u, err := upstream.New("alpha", url, circuit.New(0.01, time.Hour), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func newExecutor(t *testing.T, url string) (*Executor, *upstream.Upstream) {
 	chain := filter.NewChain(filter.NewResilienceFilter(func(ctx *core.Context) *upstream.Upstream {
 		return pool.GetByID(ctx.UpstreamID)
 	}))
-	return New(router.NewSmart(pool), core.NewInMemoryTracer(), chain, testMetrics), u
+	return New(router.NewSmart(pool, 0), core.NewInMemoryTracer(), chain, testMetrics), u
 }
 
 func serve(e *Executor) *httptest.ResponseRecorder {

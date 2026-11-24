@@ -24,18 +24,26 @@ func main() {
 	alphaURL := config.GetEnv("ALPHA_URL", "http://localhost:3001")
 	betaURL := config.GetEnv("BETA_URL", "http://localhost:3002")
 
-	alpha, err := upstream.New("alpha", alphaURL, circuit.New(0.5, 10*time.Second))
+	errorThreshold := config.GetFloat("BREAKER_ERROR_THRESHOLD", 0.5)
+	retryTimeout := config.GetDuration("BREAKER_RETRY_TIMEOUT", 10*time.Second)
+	exploration := config.GetFloat("EXPLORATION_RATE", 0.3)
+	timeout := config.GetDuration("UPSTREAM_TIMEOUT", 2*time.Second)
+
+	log.Printf("[conduit] breaker threshold=%.2f retry=%s, exploration=%.2f, upstream timeout=%s",
+		errorThreshold, retryTimeout, exploration, timeout)
+
+	alpha, err := upstream.New("alpha", alphaURL, circuit.New(errorThreshold, retryTimeout), timeout)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	beta, err := upstream.New("beta", betaURL, circuit.New(0.5, 10*time.Second))
+	beta, err := upstream.New("beta", betaURL, circuit.New(errorThreshold, retryTimeout), timeout)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	upstreamPool := upstream.NewPool([]*upstream.Upstream{alpha, beta})
-	smartRouter := router.NewSmart(upstreamPool)
+	smartRouter := router.NewSmart(upstreamPool, exploration)
 	proxyMetrics := metrics.New()
 	metrics.RegisterUpstreams(upstreamPool.All(), router.Score)
 	filterChain := filter.NewChain(

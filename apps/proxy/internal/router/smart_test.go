@@ -10,7 +10,7 @@ import (
 
 func newUpstream(t *testing.T, id string, b *circuit.Breaker) *upstream.Upstream {
 	t.Helper()
-	u, err := upstream.New(id, "http://localhost", b)
+	u, err := upstream.New(id, "http://localhost", b, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,9 +18,7 @@ func newUpstream(t *testing.T, id string, b *circuit.Breaker) *upstream.Upstream
 }
 
 func newRouter(ups ...*upstream.Upstream) *SmartRouter {
-	r := NewSmart(upstream.NewPool(ups))
-	r.exploration = 0
-	return r
+	return NewSmart(upstream.NewPool(ups), 0)
 }
 
 func TestPicksLowerLatency(t *testing.T) {

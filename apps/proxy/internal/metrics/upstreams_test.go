@@ -12,7 +12,7 @@ import (
 
 func TestUpstreamGaugesReadLiveState(t *testing.T) {
 	b := circuit.New(0.01, time.Hour)
-	u, err := upstream.New("alpha", "http://localhost", b)
+	u, err := upstream.New("alpha", "http://localhost", b, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

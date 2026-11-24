@@ -12,7 +12,7 @@ import (
 func newResilience(t *testing.T) (*ResilienceFilter, *circuit.Breaker) {
 	t.Helper()
 	b := circuit.New(0.01, time.Hour)
-	u, err := upstream.New("alpha", "http://localhost", b)
+	u, err := upstream.New("alpha", "http://localhost", b, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestResilienceOpensOn5xx(t *testing.T) {
 func TestResilienceProbeClosesOnNon5xx(t *testing.T) {
 	for _, code := range []int{200, 404} {
 		b := circuit.New(0.01, time.Millisecond)
-		u, err := upstream.New("alpha", "http://localhost", b)
+		u, err := upstream.New("alpha", "http://localhost", b, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

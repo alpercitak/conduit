@@ -8,17 +8,17 @@ import (
 	"proxy/internal/upstream"
 )
 
-const explorationRate = 0.3
-
 type SmartRouter struct {
 	pool        *upstream.Pool
 	exploration float64
 }
 
-func NewSmart(pool *upstream.Pool) *SmartRouter {
+// NewSmart picks a random available upstream with probability exploration
+// (0..1), and the best-scoring one otherwise.
+func NewSmart(pool *upstream.Pool, exploration float64) *SmartRouter {
 	return &SmartRouter{
 		pool:        pool,
-		exploration: explorationRate,
+		exploration: exploration,
 	}
 }
 

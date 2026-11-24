@@ -2,13 +2,15 @@ package upstream
 
 import (
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
 )
 
 func TestSingleFailureAfterSuccessesIsNotFatal(t *testing.T) {
-	u, _ := New("a", "http://localhost", nil)
+	u, _ := New("a", "http://localhost", nil, 0)
 	for range 10 {
 		u.Record(time.Millisecond, false)
 	}
@@ -21,7 +23,7 @@ func TestSingleFailureAfterSuccessesIsNotFatal(t *testing.T) {
 }
 
 func TestSubMillisecondLatencyIsKept(t *testing.T) {
-	u, _ := New("a", "http://localhost", nil)
+	u, _ := New("a", "http://localhost", nil, 0)
 	u.Record(300*time.Microsecond, false)
 	u.Record(300*time.Microsecond, false)
 
@@ -32,7 +34,7 @@ func TestSubMillisecondLatencyIsKept(t *testing.T) {
 }
 
 func TestLatencyEWMA(t *testing.T) {
-	u, _ := New("a", "http://localhost", nil)
+	u, _ := New("a", "http://localhost", nil, 0)
 	u.Record(100*time.Millisecond, false)
 	u.Record(200*time.Millisecond, false)
 
@@ -44,7 +46,7 @@ func TestLatencyEWMA(t *testing.T) {
 }
 
 func TestConcurrentRecordAndStats(t *testing.T) {
-	u, _ := New("a", "http://localhost", nil)
+	u, _ := New("a", "http://localhost", nil, 0)
 	var wg sync.WaitGroup
 	for i := range 50 {
 		wg.Add(2)
@@ -52,4 +54,29 @@ func TestConcurrentRecordAndStats(t *testing.T) {
 		go func() { defer wg.Done(); u.Stats() }()
 	}
 	wg.Wait()
+}
+
+func TestHungUpstreamTimesOutWith502(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		<-release
+	}))
+	defer srv.Close()
+	defer close(release)
+
+	u, err := New("a", srv.URL, nil, 50*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	start := time.Now()
+	rec := httptest.NewRecorder()
+	u.Proxy.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("want 502, got %d", rec.Code)
+	}
+	if took := time.Since(start); took > time.Second {
+		t.Fatalf("want timeout near 50ms, took %s", took)
+	}
 }

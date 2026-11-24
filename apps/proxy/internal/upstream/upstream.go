@@ -15,9 +15,6 @@ const (
 	alphaLatency = 0.2
 	alphaError   = 0.3
 
-	// responseHeaderTimeout caps how long a hung upstream can hold a request.
-	responseHeaderTimeout = 2 * time.Second
-
 	// StatusClientClosedRequest (nginx's 499) marks requests the client
 	// abandoned. It is below 500, so it doesn't count against the upstream.
 	StatusClientClosedRequest = 499
@@ -34,14 +31,16 @@ type Upstream struct {
 	hasLatency  bool
 }
 
-func New(id, rawURL string, breaker *circuit.Breaker) (*Upstream, error) {
+// New proxies to rawURL. timeout caps how long a hung upstream can hold a
+// request before it fails with 502; zero means no limit.
+func New(id, rawURL string, breaker *circuit.Breaker, timeout time.Duration) (*Upstream, error) {
 	target, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
 	}
 
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.ResponseHeaderTimeout = responseHeaderTimeout
+	transport.ResponseHeaderTimeout = timeout
 	transport.MaxIdleConnsPerHost = 100 // default 2 forces a new connection per request under load
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
