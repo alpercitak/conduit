@@ -34,3 +34,9 @@ func (rw *ResponseWriter) Write(b []byte) (int, error) {
 	rw.wroteHeader = true
 	return rw.ResponseWriter.Write(b)
 }
+
+// Unwrap lets http.ResponseController (used by ReverseProxy) reach
+// Flush and friends on the underlying writer.
+func (rw *ResponseWriter) Unwrap() http.ResponseWriter {
+	return rw.ResponseWriter
+}

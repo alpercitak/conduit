@@ -43,3 +43,14 @@ func TestFirstFinalStatusWins(t *testing.T) {
 		})
 	}
 }
+
+func TestFlushReachesUnderlyingWriter(t *testing.T) {
+	rec := httptest.NewRecorder()
+
+	if err := http.NewResponseController(NewResponseWriter(rec)).Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if !rec.Flushed {
+		t.Fatal("want underlying writer flushed")
+	}
+}
